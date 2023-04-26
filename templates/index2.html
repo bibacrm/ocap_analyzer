@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ARMA3 Replay Stats</title>
+  <style>
+    .small {
+        font-size: 8;
+      }
+    .hide {
+        display: none;
+      }
+    .btn_small {
+        padding: 0.1;
+        font-size: 0.8rem;
+        border-radius: 0.25rem;
+      }
+    .link {
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .link:hover {
+      color: red;
+    }
+    .header {
+      color: red;
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.23/js/dataTables.bootstrap4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.23/css/dataTables.bootstrap4.min.css">
+
+</head>
+
+<body>
+
+<div class="container mt-2">
+  <h1>ARMA3 RBC OCAP Based Replay Statistic</h1>
+  <h5>маид бай STELS</h5>
+
+  <form method="post" id="ocap_url_form">
+    <label for="ocap_url">Enter file URL:</label>
+    <input type="text" id="ocap_url" name="ocap_url">
+    <input type="submit" value="Submit">
+  </form>
+</div>
+
+<div class="container mt-3">
+  <h3>OCAP replay list</h3>
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#ocap-list-collapse-table" aria-expanded="false" aria-controls="ocap-list-collapse-table">
+    Expand/collapse OCAP replay list table
+  </button>
+  <div class="collapse" id="ocap-list-collapse-table">
+    .
+  <table id="ocap-list-table" class="table table-striped table-bordered table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>ID</th>
+        <th>Mission name</th>
+        <th>Map</th>
+        <th>Duration</th>
+        <th>Date</th>
+        <th>Tag</th>
+        <th>File name</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for replay in replay_list %}
+        <tr id="row_{{ replay['id'] }}">
+          <td class="replay_id link">
+            {{ replay['id'] }}
+            <div class="hide">{{ replay['filename'] }}</div>
+          </td>
+          <td>{{ replay['mission_name'] }}</td>
+          <td>{{ replay['world_name'] }}</td>
+          <td>{{ replay['mission_duration']}}</td>
+          <td>{{ replay['date'] }}</td>
+          <td>{{ replay['tag'] }}</td>
+          <td>
+            {% set salt = range(1, 1000) | random %}
+            <button type="button" class="btn-primary btn_small" data-toggle="collapse" data-target="#replay_{{ salt }}" aria-expanded="false" aria-controls="replay_{{ salt }}">
+              Show details
+            </button>
+            <div class="collapse" id="replay_{{ salt }}">
+              <div class="card card-body file_name">
+              {{ replay['filename'] }}
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="container mt-3">
+  <h1>{{ mission_name }}</h1>
+  <h5>Author: {{ mission_author }}</h5>
+  <h3>Player statistic</h3>
+  <table id="stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>Player</th>
+        <th>Frags</th>
+        <th>Side</th>
+        <th>Group</th>
+        <th>Teamkills</th>
+        <th>Victims</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for player, stats in stat_data.items() %}
+        <tr>
+          <td>{{ player }}</td>
+          <td>{{ stats['frags'] }}</td>
+          <td>{{ stats['side'] }}</td>
+          <td>{{ stats['group'] }}</td>
+          <td>{{ stats['teamkills'] }}</td>
+          <td>
+            {% set salt = range(1, 1000) | random %}
+            <button type="button" class="btn-primary btn_small" data-toggle="collapse" data-target="#player_victims_{{ salt }}" aria-expanded="false" aria-controls="player_victims_{{ salt }}">
+              Show details
+            </button>
+            <div class="collapse" id="player_victims_{{ salt }}">
+              <div class="card card-body">
+                <table class="table table-hover table-responsive table-sm">
+                  <tbody>
+                    <tr>
+                      <td colspan="5">Kills</td>
+                    </tr>
+                    {% for victim in stats['victims'] %}
+                    <tr>
+                      <td style="color:red">{{ victim['teamkilla'] }}</td>
+                      <td>{{ victim['time'] }}</td>
+                      <td>{{ victim['victim_name'] }}</td>
+                      <td>{{ victim['distance'] }}m</td>
+                      <td>{{ victim['weapon'] }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if 'death_data' in stats %}
+                    <tr>
+                      <td colspan="5">Death</td>
+                    </tr>
+                    <tr>
+                      <td style="color:red">{{ stats['death_data']['teamkilla'] }}</td>
+                      <td>{{ stats['death_data']['time'] }}</td>
+                      <td>{{ stats['death_data']['killer'] }}</td>
+                      <td>{{ stats['death_data']['distance'] }}m</td>
+                      <td>{{ stats['death_data']['weapon'] }}</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+<div class="container mt-3">
+  <h3>Team statistic</h3>
+  <table id="team-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>Team</th>
+        <th>Frags</th>
+        <th>Side</th>
+        <th>Teamkills</th>
+        <th>Victims</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for team, stats in team_stat_data.items() %}
+        <tr>
+          <td>{{ team }}</td>
+          <td>{{ stats['frags'] }}</td>
+          <td>{{ stats['side'] }}</td>
+          <td>{{ stats['teamkills'] }}</td>
+          <td>
+            {% set salt = range(1, 1000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#team_victims_{{ salt }}" aria-expanded="false" aria-controls="team_victims_{{ salt }}">
+              Show details
+            </button>
+            <div class="collapse" id="team_victims_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for victim in stats['victims'] %}
+                  <tr>
+                    <td style="color:red">{{ victim['teamkilla'] }}</td>
+                    <td>{{ victim['time'] }}</td>
+                    <td>{{ victim['victim_name'] }}</td>
+                    <td>{{ victim['killer'] }}</td>
+                    <td>{{ victim['distance'] }}m</td>
+                    <td>{{ victim['weapon'] }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+<div class="container mt-3">
+  <div class="row">
+    <div class="col-md-6">
+      <h3>KO revival statistic</h3>
+      <table id="ko-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>KO revivals</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for player, revivals in ko_stats_data.items() %}
+            <tr>
+              <td>{{ player }}</td>
+              <td>{{ revivals }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+    <div class="col-md-6">
+      <h3>Player connection statistic</h3>
+      <table id="connection-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Connection events</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for player, connections in connected_stats_data.items() %}
+            <tr>
+              <td>{{ player }}</td>
+              <td>{{ connections }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p>Олл райтс резёрвед, копирайт @ 2023</p>
+
+<script>
+  $(document).ready(function() {
+    $('.stats-table').DataTable({
+      "paging": true,
+      "lengthChange": true,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "order": [[ 1, "desc" ]]
+    });
+    $('#ocap-list-table').DataTable({
+      "paging": true,
+      "lengthChange": true,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "order": [[ 0, "desc" ]]
+    });
+  });
+</script>
+
+<script>
+  const table = document.getElementById('ocap-list-table');
+  table.addEventListener('click', function(event) {
+    if (event.target.classList.contains('replay_id')) {
+      var divText = event.target.querySelector('div').textContent;
+      var file_name_url = "https://ocap.red-bear.ru/data/" + divText.trim()
+      $('#ocap_url').val(file_name_url);
+      $('#ocap_url_form').submit();
+    }
+  });
+</script>
+
+
+</body>
+</html>
