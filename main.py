@@ -27,8 +27,12 @@ def process_ocap_file(data_url):
         'team_stats': {},
         'ko_stats': {},
         'connected_stats': {},
-        'mission_name': 'Please expand the replay list above and select a mission replay',
-        'mission_author': ""
+        'mission_name': 'Please expand the list above and select a mission replay',
+        'mission_author': "",
+        'mission_duration': "",
+        'sides': {},
+        'player_counts': {},
+        'winner': ''
     }
     if data_url is None:
         return statistic_result
@@ -42,11 +46,15 @@ def process_ocap_file(data_url):
 
     mission_name = data.get('missionName')
     mission_author = data.get('missionAuthor')
+    mission_duration = seconds_to_human(data.get('endFrame'))
 
     frag_stats = {}
     team_stats = {}
     players = {}
+    player_counts = {}
     kills = []
+    sides = []
+    winner = ''
 
     for entity in data['entities']:
         player_data = {
@@ -56,6 +64,18 @@ def process_ocap_file(data_url):
             'group': entity.get("group", 'no_group')
         }
         players.update({entity['id']: player_data})
+
+        if entity.get('isPlayer', 0) == 1:
+            if len(sides) == 0:
+                sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0})
+            if len(sides) == 1 and player_data['side'] != sides[0]['name']:
+                sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0})
+
+            if player_data['side'] == sides[0]['name']:
+                sides[0]['players'] += 1
+            else:
+                sides[1]['players'] += 1
+
     players.update({999: {'id': 999, 'name': 'unknown(null)', 'side': 'no_side', 'group': 'no_group'}})
 
     for event in data['events']:
@@ -68,6 +88,8 @@ def process_ocap_file(data_url):
                 "time": event[0] if event[0] != 'null' else 0,
             }
             kills.append(kill_data)
+        elif event[1] == 'endMission':
+            winner = f'{event[2][0]} - {event[2][1]}'
 
     for kill in kills:
         killer_id = kill['killer_id']
@@ -147,7 +169,10 @@ def process_ocap_file(data_url):
         'ko_stats': ko_stats,
         'connected_stats': connected_stats,
         'mission_name': mission_name,
-        'mission_author': mission_author
+        'mission_author': mission_author,
+        'mission_duration': mission_duration,
+        'sides': sides,
+        'winner': winner
     }
     return statistic_result
 
@@ -173,6 +198,9 @@ def index():
         connected_stats_data=stats_report['connected_stats'],
         mission_name=stats_report['mission_name'],
         mission_author=stats_report['mission_author'],
+        mission_duration=stats_report['mission_duration'],
+        sides=stats_report['sides'],
+        winner=stats_report['winner'],
         replay_list=replay_list_data
     )
 
