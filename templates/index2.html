@@ -101,7 +101,11 @@
 
 <div class="container mt-3">
   <h1>{{ mission_name }}</h1>
-  <h5>Author: {{ mission_author }}</h5>
+  <h6>Author: {{ mission_author }} Duration: {{ mission_duration }}</h6>
+  {% for side in sides %}
+  <h6>{{ side['name'] }} Commandor - {{ side['ks'] }}, Players - {{ side['players'] }}</h6>
+  {% endfor %}
+  <h6 style="color:green">Winner: {{ winner }}</h6>
   <h3>Player statistic</h3>
   <table id="stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
