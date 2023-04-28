@@ -2,6 +2,8 @@ from flask import Flask, render_template, request
 import json
 import requests
 import datetime
+import os
+import hashlib
 
 REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2023-01-01&older=2026-01-01'
 
@@ -31,18 +33,33 @@ def process_ocap_file(data_url):
         'mission_author': "",
         'mission_duration': "",
         'sides': {},
-        'player_counts': {},
         'winner': ''
     }
     if data_url is None:
         return statistic_result
 
-    response = requests.get(data_url)
+    cache_folder = './cache'
+    results_folder = './cache/results'
+    os.makedirs(cache_folder, exist_ok=True)
+    os.makedirs(results_folder, exist_ok=True)
 
-    with open("temp_ocap.json", "wb") as temp_file:
-        temp_file.write(response.content)
-    with open('temp_ocap.json', encoding="utf-8") as f:
-        data = json.load(f)
+    cache_file = os.path.join(cache_folder, hashlib.md5(data_url.encode()).hexdigest())
+    cache_results = os.path.join(results_folder, hashlib.md5(data_url.encode()).hexdigest())
+
+    if os.path.exists(cache_results):
+        with open(cache_results, encoding="utf-8") as f:
+            statistic_result = json.load(f)
+        return statistic_result
+
+    if os.path.exists(cache_file):
+        with open(cache_file, encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        response = requests.get(data_url)
+        with open(cache_file, "wb") as temp_file:
+            temp_file.write(response.content)
+        with open(cache_file, encoding="utf-8") as f:
+            data = json.load(f)
 
     mission_name = data.get('missionName')
     mission_author = data.get('missionAuthor')
@@ -51,7 +68,6 @@ def process_ocap_file(data_url):
     frag_stats = {}
     team_stats = {}
     players = {}
-    player_counts = {}
     kills = []
     sides = []
     winner = ''
@@ -63,9 +79,22 @@ def process_ocap_file(data_url):
             'side': entity.get('side', 'no_side'),
             'group': entity.get("group", 'no_group')
         }
+
+        update_frames = [1200, 900, 600, 300, 180]  # 20min, 15min, 10min, 5min, 3min delay to get updated name and type
+        updated_isplayer = 0
+        for update_frame in update_frames:
+            try:
+                updated_name = entity['positions'][update_frame][4]
+                player_data['name'] = updated_name if updated_name != '' else player_data['name']
+                updated_isplayer = entity['positions'][update_frame][5]
+                if updated_isplayer == 1:
+                    break
+            except IndexError:
+                pass
+
         players.update({entity['id']: player_data})
 
-        if entity.get('isPlayer', 0) == 1:
+        if entity.get('isPlayer', 0) == 1 or updated_isplayer == 1:
             if len(sides) == 0:
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0})
             if len(sides) == 1 and player_data['side'] != sides[0]['name']:
@@ -101,12 +130,11 @@ def process_ocap_file(data_url):
         victim_group = players[victim_id].get("group", 'no_group')
         killer_group = players[killer_id].get("group", 'no_group')
 
-        teamkilla = "TK" if killer_side == victim_side else ""
+        teamkilla = "TK" if (killer_side == victim_side and killer_id != victim_id) else ""
 
         if killer_name not in frag_stats:
             frag_stats[killer_name] = {'frags': 0, 'side': killer_side, 'group': killer_group, 'teamkills': 0,
                                        'victims': []}
-        frag_stats[killer_name]['frags'] += 1
         victim_data = {
             'teamkilla': teamkilla,
             'time': seconds_to_human(kill['time']),
@@ -115,7 +143,11 @@ def process_ocap_file(data_url):
             'weapon': kill['weapon'],
             'killer': killer_name
         }
-        frag_stats[killer_name]['victims'].append(victim_data)
+
+        if killer_id != victim_id:
+            if killer_side != victim_side:
+                frag_stats[killer_name]['frags'] += 1
+            frag_stats[killer_name]['victims'].append(victim_data)
 
         if victim_name not in frag_stats:
             frag_stats[victim_name] = {'frags': 0, 'side': victim_side, 'group': victim_group, 'teamkills': 0,
@@ -123,22 +155,24 @@ def process_ocap_file(data_url):
         frag_stats[victim_name]['death_data'] = victim_data
 
         if "[" in killer_name and "]" in killer_name:
-            killer_team = killer_name.split("[")[1].split("]")[0]
+            killer_team = killer_name.split("[")[1].split("]")[0].strip('~')
         elif 'Dw.' in killer_name:
             killer_team = 'Dw'
         elif '=]B[=' in killer_name:
             killer_team = 'B'
         else:
-            killer_team = 'Odino4ki'
+            killer_team = f'Odino4ki {killer_side}'
 
         if killer_team not in team_stats:
             team_stats[killer_team] = {'frags': 0, 'side': killer_side, 'teamkills': 0, 'victims': []}
-        team_stats[killer_team]['frags'] += 1
-        team_stats[killer_team]['victims'].append(victim_data)
 
-        if killer_side == victim_side:
-            frag_stats[killer_name]['teamkills'] += 1
-            team_stats[killer_team]['teamkills'] += 1
+        if killer_id != victim_id:
+            if killer_side == victim_side:
+                frag_stats[killer_name]['teamkills'] += 1
+                team_stats[killer_team]['teamkills'] += 1
+            else:
+                team_stats[killer_team]['frags'] += 1
+            team_stats[killer_team]['victims'].append(victim_data)
 
     ko_stats = {}
 
@@ -174,6 +208,9 @@ def process_ocap_file(data_url):
         'sides': sides,
         'winner': winner
     }
+    with open(cache_results, "w") as f:
+        json.dump(statistic_result, f)
+
     return statistic_result
 
 
@@ -190,8 +227,13 @@ def index():
     for replay in replay_list_data:
         replay['mission_duration'] = seconds_to_human(replay['mission_duration'])
 
+    loading_message = "Loading..."
+    if data_url is not None:
+        loading_message = "Processing OCAP file, please wait..."
+
     return render_template(
         'index2.html',
+        loading_message=loading_message,
         stat_data=stats_report['frag_stats'],
         team_stat_data=stats_report['team_stats'],
         ko_stats_data=stats_report['ko_stats'],
