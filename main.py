@@ -7,12 +7,6 @@ import hashlib
 
 REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2023-01-01&older=2026-01-01'
 
-# with open('ocap_example.json', encoding="utf-8") as f:
-#     data = json.load(f)
-
-# URL = "https://ocap.red-bear.ru/data/2023_04_22__19_36_RBC199Spasenieostrova2jexp.json"
-# URL = "https://ocap.red-bear.ru/data/2023_04_22__23_18_RBC195ObeliskReborn1eexp.json"
-
 app = Flask(__name__)
 
 
@@ -35,9 +29,12 @@ def process_ocap_file(data_url):
         'sides': {},
         'winner': ''
     }
+
     if data_url is None:
+        # Start page case
         return statistic_result
 
+    # Cache settings and preparation
     cache_folder = './cache'
     results_folder = './cache/results'
     os.makedirs(cache_folder, exist_ok=True)
@@ -46,6 +43,7 @@ def process_ocap_file(data_url):
     cache_file = os.path.join(cache_folder, hashlib.md5(data_url.encode()).hexdigest())
     cache_results = os.path.join(results_folder, hashlib.md5(data_url.encode()).hexdigest())
 
+    # Cache logic
     if os.path.exists(cache_results):
         with open(cache_results, encoding="utf-8") as f:
             statistic_result = json.load(f)
@@ -61,17 +59,22 @@ def process_ocap_file(data_url):
         with open(cache_file, encoding="utf-8") as f:
             data = json.load(f)
 
+    # Basic data for Mission statistic header
     mission_name = data.get('missionName')
     mission_author = data.get('missionAuthor')
     mission_duration = seconds_to_human(data.get('endFrame'))
 
+    # Main statistic containers preparation
     frag_stats = {}
     team_stats = {}
     players = {}
     kills = []
     sides = []
+    ko_stats = {}
+    connected_stats = {}
     winner = ''
 
+    # List of player objects creation as dicts
     for entity in data['entities']:
         player_data = {
             'id': entity['id'],
@@ -80,6 +83,7 @@ def process_ocap_file(data_url):
             'group': entity.get("group", 'no_group')
         }
 
+        # As a player can connect and replace a bot after a while, trying to get and store updated value
         update_frames = [1200, 900, 600, 300, 180]  # 20min, 15min, 10min, 5min, 3min delay to get updated name and type
         updated_isplayer = 0
         for update_frame in update_frames:
@@ -94,6 +98,7 @@ def process_ocap_file(data_url):
 
         players.update({entity['id']: player_data})
 
+        # Identification of side commanders, players count
         if entity.get('isPlayer', 0) == 1 or updated_isplayer == 1:
             if len(sides) == 0:
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0})
@@ -104,9 +109,10 @@ def process_ocap_file(data_url):
                 sides[0]['players'] += 1
             else:
                 sides[1]['players'] += 1
-
+    # Adding a dummy player for handling null or empty statistic records
     players.update({999: {'id': 999, 'name': 'unknown(null)', 'side': 'no_side', 'group': 'no_group'}})
 
+    # Basic data collecting for kill events
     for event in data['events']:
         if event[1] == 'killed':
             kill_data = {
@@ -114,12 +120,13 @@ def process_ocap_file(data_url):
                 "killer_id": event[3][0] if event[3][0] != 'null' else 999,
                 "distance": event[4] if event[4] != 'null' else 0,
                 "weapon": event[3][1] if len(event[3]) > 1 else '',
-                "time": event[0] if event[0] != 'null' else 0,
+                "time": event[0] if event[0] != 'null' else 0,  # frame number as a fact
             }
             kills.append(kill_data)
         elif event[1] == 'endMission':
             winner = f'{event[2][0]} - {event[2][1]}'
 
+    # Main kills statistic calculation
     for kill in kills:
         killer_id = kill['killer_id']
         victim_id = kill['victim_id']
@@ -130,6 +137,7 @@ def process_ocap_file(data_url):
         victim_group = players[victim_id].get("group", 'no_group')
         killer_group = players[killer_id].get("group", 'no_group')
 
+        # Teamkillers identification, incl. incorrect 'suicide' records handling
         teamkilla = "TK" if (killer_side == victim_side and killer_id != victim_id) else ""
 
         if killer_name not in frag_stats:
@@ -144,16 +152,19 @@ def process_ocap_file(data_url):
             'killer': killer_name
         }
 
+        # Frags increment and victim list extension logic
         if killer_id != victim_id:
             if killer_side != victim_side:
                 frag_stats[killer_name]['frags'] += 1
             frag_stats[killer_name]['victims'].append(victim_data)
 
+        # Adding a record of death information for a victim
         if victim_name not in frag_stats:
             frag_stats[victim_name] = {'frags': 0, 'side': victim_side, 'group': victim_group, 'teamkills': 0,
                                        'victims': []}
         frag_stats[victim_name]['death_data'] = victim_data
 
+        # Squad tag parsing logic for a main pattern "[<Squad>]<Player>", "~" is for recruits specific players on RBC
         if "[" in killer_name and "]" in killer_name:
             killer_team = killer_name.split("[")[1].split("]")[0].strip('~')
         elif 'Dw.' in killer_name:
@@ -161,11 +172,13 @@ def process_ocap_file(data_url):
         elif '=]B[=' in killer_name:
             killer_team = 'B'
         else:
+            # specific pseudo squad for players without a squad
             killer_team = f'Odino4ki {killer_side}'
 
         if killer_team not in team_stats:
             team_stats[killer_team] = {'frags': 0, 'side': killer_side, 'teamkills': 0, 'victims': []}
 
+        # Teamkills statistic increment logic
         if killer_id != victim_id:
             if killer_side == victim_side:
                 frag_stats[killer_name]['teamkills'] += 1
@@ -174,8 +187,7 @@ def process_ocap_file(data_url):
                 team_stats[killer_team]['frags'] += 1
             team_stats[killer_team]['victims'].append(victim_data)
 
-    ko_stats = {}
-
+    # KO revival calculation logic. Checking player frames for being knocked and then active again cases
     for player in data['entities']:
         down = False
         for position in player['positions']:
@@ -189,8 +201,7 @@ def process_ocap_file(data_url):
             elif position[2] == 0:
                 break
 
-    connected_stats = {}
-
+    # Connected attempts calculation logic
     for event in data['events']:
         if event[1] == 'connected':
             if event[2] not in connected_stats:
@@ -208,6 +219,8 @@ def process_ocap_file(data_url):
         'sides': sides,
         'winner': winner
     }
+
+    # Calculated statistic storing in cache
     with open(cache_results, "w") as f:
         json.dump(statistic_result, f)
 
@@ -217,16 +230,20 @@ def process_ocap_file(data_url):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     data_url = None
+    # Getting submitted form parameter with a direct OCAP replay json file URL
     if request.method == 'POST':
         data_url = request.form['ocap_url']
     stats_report = process_ocap_file(data_url)
 
+    # Getting replay list data
     response = requests.get(REPLAY_LIST_URL)
     replay_list_data = response.json()
 
+    # Mission duration converting logic
     for replay in replay_list_data:
         replay['mission_duration'] = seconds_to_human(replay['mission_duration'])
 
+    # loading modal window text definition
     loading_message = "Loading..."
     if data_url is not None:
         loading_message = "Processing OCAP file, please wait..."
