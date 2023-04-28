@@ -39,11 +39,30 @@
 
 <body>
 
+<!-- Loading Modal -->
+<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Fog the page when the modal is shown -->
+<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
+
+
 <div class="container mt-2">
   <h1>ARMA3 RBC OCAP Based Replay Statistic</h1>
   <h5>маид бай STELS</h5>
 
-  <form method="post" id="ocap_url_form">
+  <form method="post" id="ocap_url_form" class="small">
     <label for="ocap_url">Enter file URL:</label>
     <input type="text" id="ocap_url" name="ocap_url">
     <input type="submit" value="Submit">
@@ -56,7 +75,7 @@
     Expand/collapse OCAP replay list table
   </button>
   <div class="collapse" id="ocap-list-collapse-table">
-    .
+  </br>
   <table id="ocap-list-table" class="table table-striped table-bordered table-hover table-sm">
     <thead class="thead-dark">
       <tr>
@@ -106,7 +125,7 @@
   <h6>{{ side['name'] }} Commandor - {{ side['ks'] }}, Players - {{ side['players'] }}</h6>
   {% endfor %}
   <h6 style="color:green">Winner: {{ winner }}</h6>
-  <h3>Player statistic</h3>
+  <h3>Players statistic</h3>
   <table id="stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
       <tr>
@@ -123,7 +142,13 @@
         <tr>
           <td>{{ player }}</td>
           <td>{{ stats['frags'] }}</td>
+          {% if stats['side'] == "WEST" %}
+          <td style="color: blue;">{{ stats['side'] }}</td>
+          {% elif stats['side'] == "EAST" %}
+          <td style="color: red;">{{ stats['side'] }}</td>
+          {% else %}
           <td>{{ stats['side'] }}</td>
+          {% endif %}
           <td>{{ stats['group'] }}</td>
           <td>{{ stats['teamkills'] }}</td>
           <td>
@@ -171,7 +196,7 @@
 </div>
 
 <div class="container mt-3">
-  <h3>Team statistic</h3>
+  <h3>Teams statistic</h3>
   <table id="team-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
       <tr>
@@ -187,7 +212,13 @@
         <tr>
           <td>{{ team }}</td>
           <td>{{ stats['frags'] }}</td>
+          {% if stats['side'] == "WEST" %}
+          <td style="color: blue;">{{ stats['side'] }}</td>
+          {% elif stats['side'] == "EAST" %}
+          <td style="color: red;">{{ stats['side'] }}</td>
+          {% else %}
           <td>{{ stats['side'] }}</td>
+          {% endif %}
           <td>{{ stats['teamkills'] }}</td>
           <td>
             {% set salt = range(1, 1000) | random %}
@@ -297,6 +328,25 @@
       $('#ocap_url').val(file_name_url);
       $('#ocap_url_form').submit();
     }
+  });
+</script>
+
+<script>
+  $(function() {
+    // show the loading modal on form submit
+    $('form').submit(function() {
+      $('#loadingModal').modal({
+        backdrop: 'static',
+        keyboard: false
+      });
+      $('#loadingFog').show();
+    });
+
+    // hide the loading modal on page load
+    $(window).on('load', function() {
+      $('#loadingModal').modal('hide');
+      $('#loadingFog').hide();
+    });
   });
 </script>
 
