@@ -26,9 +26,13 @@
     .header {
       color: red;
     }
+    .tooltip-inner {
+    white-space: pre-wrap;
+    }
   </style>
 
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.10.23/js/dataTables.bootstrap4.min.js"></script>
@@ -59,33 +63,49 @@
 
 
 <div class="container mt-2">
-  <h1>ARMA3 RBC OCAP Based Replay Statistic</h1>
-  <h5>маид бай STELS</h5>
+  <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
+  <h5><a href="/total">маид бай STELS</a></h5>
+  <h5>Statistic by mission, starting 01.01.2021</h5>
 
   <form method="post" id="ocap_url_form" class="small">
     <label for="ocap_url">Enter file URL:</label>
     <input type="text" id="ocap_url" name="ocap_url">
     <input type="submit" value="Submit">
   </form>
+  {% if error_message != '' %}
+  <h3>{{ error_message }}</h3>
+  {% endif %}
 </div>
 
 <div class="container mt-3">
   <h3>OCAP replay list</h3>
-  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#ocap-list-collapse-table" aria-expanded="false" aria-controls="ocap-list-collapse-table">
+  {% if error_message == '' %}
+    {% set expanded = 'false' %}
+    {% set expanded_class = '' %}
+  {% else %}
+    {% set expanded = 'true' %}
+    {% set expanded_class = 'show' %}
+  {% endif %}
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#ocap-list-collapse-table" aria-expanded="{{ expanded }}" aria-controls="ocap-list-collapse-table">
     Expand/collapse OCAP replay list table
   </button>
-  <div class="collapse" id="ocap-list-collapse-table">
-  </br>
+</div>
+
+<!-- <div class="container-fluid mt-3" style="max-width: 1400px;"> -->
+<div class="container mt-3">
+  <div class="collapse {{ expanded_class }}" id="ocap-list-collapse-table">
   <table id="ocap-list-table" class="table table-striped table-bordered table-hover table-sm">
     <thead class="thead-dark">
       <tr>
         <th>ID</th>
         <th>Mission name</th>
+        <th>Players</th>
+        <th>TK</th>
         <th>Map</th>
         <th>Duration</th>
         <th>Date</th>
         <th>Tag</th>
-        <th>File name</th>
+        <!-- <th>File name</th> -->
       </tr>
     </thead>
     <tbody>
@@ -96,21 +116,34 @@
             <div class="hide">{{ replay['filename'] }}</div>
           </td>
           <td>{{ replay['mission_name'] }}</td>
+          <td>
+            {% if 'stats' in replay %}
+              {% if replay['stats']|length > 1%}
+                <div class="hide">{{ replay['stats'] }}</div>
+                {% if replay['stats'][0]['win'] == 1 %}
+                  {% set tooltip = replay['stats'][0]['ks'] + ' (Winner)\n' + replay['stats'][1]['ks'] %}
+                {% else %}
+                  {% set tooltip = replay['stats'][0]['ks'] + '\n' + replay['stats'][1]['ks'] + ' (Winner)' %}
+                {% endif %}
+                <a href="#" data-toggle="tooltip" data-placement="right" data-original-title="{{ tooltip }}">
+                  {% set total = replay['stats'][0]['players'] + replay['stats'][1]['players'] %}
+                  {{ total }} ({{ replay['stats'][0]['players'] }}/{{ replay['stats'][1]['players'] }})
+                </a>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if 'stats' in replay %}
+              {% if replay['stats']|length > 1%}
+                {% set total = replay['stats'][0]['tk'] + replay['stats'][1]['tk'] %}
+                {{ total }} ({{ replay['stats'][0]['tk'] }}/{{ replay['stats'][1]['tk'] }})
+              {% endif %}
+            {% endif %}
+          </td>
           <td>{{ replay['world_name'] }}</td>
           <td>{{ replay['mission_duration']}}</td>
           <td>{{ replay['date'] }}</td>
           <td>{{ replay['tag'] }}</td>
-          <td>
-            {% set salt = range(1, 1000) | random %}
-            <button type="button" class="btn-primary btn_small" data-toggle="collapse" data-target="#replay_{{ salt }}" aria-expanded="false" aria-controls="replay_{{ salt }}">
-              Show details
-            </button>
-            <div class="collapse" id="replay_{{ salt }}">
-              <div class="card card-body file_name">
-              {{ replay['filename'] }}
-              </div>
-            </div>
-          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -118,6 +151,7 @@
   </div>
 </div>
 
+{% if error_message == '' %}
 <div class="container mt-3">
   <h1>{{ mission_name }}</h1>
   <h6>Author: {{ mission_author }} Duration: {{ mission_duration }}</h6>
@@ -293,9 +327,10 @@
     </div>
   </div>
 </div>
-
-<p>Олл райтс резёрвед, копирайт @ 2023</p>
-
+{% endif %}
+<div class="container mt-3">
+  <p>Олл райтс резёрвед, копирайт @ 2023</p>
+</div>
 <script>
   $(document).ready(function() {
     $('.stats-table').DataTable({
@@ -348,6 +383,23 @@
       $('#loadingFog').hide();
     });
   });
+</script>
+
+<script>
+$(document).ready(function() {
+  // Define a function to initialize the tooltips
+  function initTooltips() {
+    $('[data-toggle="tooltip"]').tooltip();
+  }
+
+  // Call the initTooltips function on document ready
+  initTooltips();
+
+  // Call the initTooltips function whenever the table is updated
+  $('#ocap-list-table').on('draw.dt page.dt search.dt order.dt', function() {
+    initTooltips();
+  });
+});
 </script>
 
 
