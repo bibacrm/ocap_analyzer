@@ -62,17 +62,17 @@
 <div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
 
 
-<div class="container mt-2">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
   <h5>маид бай STELS</h5>
-  <h5>TVT and TVT2 total statistic, starting 01.01.2021</h5>
+  <h5>TVT and TVT2 total statistic, starting 01.01.2020, missions 30min+</h5>
   {% if error_message != '' %}
   <h3>{{ error_message }}</h3>
   {% endif %}
 </div>
 
 {% if error_message == '' %}
-<div class="container mt-3">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <h3>Kiberkotlets statistic</h3>
   <table id="frag-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
@@ -80,8 +80,11 @@
         <th>Player</th>
         <th>Frags</th>
         <th>Missions</th>
-        <th>Kills/Missions</th>
-        <th>Kills/Deaths</th>
+        <th>Frags/Missions</th>
+        <th>Frags/Deaths</th>
+        <th>Tech Kills</th>
+        <th>(AI) Kills</th>
+        <th data-searchable="false">Victims</th>
       </tr>
     </thead>
     <tbody>
@@ -92,13 +95,85 @@
           <td>{{ stats['missions'] }}</td>
           <td>{{ stats['k_m'] }}</td>
           <td>{{ stats['k_d'] }}</td>
+          <td>{{ stats['vehicle_frags'] }}</td>
+          <td>{{ stats['bot_frags'] }}</td>
+          <td>
+            {% set salt = range(1, 10000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#victim_list_{{ salt }}" aria-expanded="false" aria-controls="victim_list_{{ salt }}">
+              Show top 20 victims
+            </button>
+            <div class="collapse" id="victim_list_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for name, count in stats['victims']: %}
+                  <tr>
+                    <td>{{ name }}</td>
+                    <td>{{ count }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
   </table>
 </div>
 
-<div class="container mt-3">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <h3>Kiberkotlets statistic by steam account</h3>
+  <table id="frag_steam-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>Player</th>
+        <th>Frags</th>
+        <th>Missions</th>
+        <th>Frags/Missions</th>
+        <th>Frags/Deaths</th>
+        <th>Tech Kills</th>
+        <th>(AI) Kills</th>
+        <th>Name List</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for player, stats in frag_stats_steam.items() %}
+        <tr>
+          <td>{{ stats['name_last'] }}</td>
+          <td>{{ stats['kills'] }}</td>
+          <td>{{ stats['missions'] }}</td>
+          <td>{{ stats['k_m'] }}</td>
+          <td>{{ stats['k_d'] }}</td>
+          <td>{{ stats['vehicle_frags'] }}</td>
+          <td>{{ stats['bot_frags'] }}</td>
+          <td>
+            {% set salt = range(1, 10000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#name_list_{{ salt }}" aria-expanded="false" aria-controls="name_list_{{ salt }}">
+              Show all names
+            </button>
+            <div class="collapse" id="name_list_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for name in stats['name_list'] %}
+                  <tr>
+                    <td>{{ name }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <h3>Kiber Squads statistic</h3>
   <table id="team-frag-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
@@ -106,7 +181,10 @@
         <th>Squad</th>
         <th>Frags</th>
         <th>Missions</th>
-        <th>Kills/Missions</th>
+        <th>Frags/Missions</th>
+        <th>Tech Kills</th>
+        <th>(AI) Kills</th>
+        <th data-searchable="false">Victims</th>
       </tr>
     </thead>
     <tbody>
@@ -116,13 +194,35 @@
           <td>{{ stats['kills'] }}</td>
           <td>{{ stats['missions'] }}</td>
           <td>{{ stats['k_m'] }}</td>
+          <td>{{ stats['vehicle_frags'] }}</td>
+          <td>{{ stats['bot_frags'] }}</td>
+          <td>
+            {% set salt = range(1, 10000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#team_victim_list_{{ salt }}" aria-expanded="false" aria-controls="team_victim_list_{{ salt }}">
+              Show top 20 victims
+            </button>
+            <div class="collapse" id="team_victim_list_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for name, count in stats['victims']: %}
+                  <tr>
+                    <td>{{ name }}</td>
+                    <td>{{ count }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
   </table>
 </div>
 
-<div class="container mt-3">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <h3>Players Teamkill statistic</h3>
   <table id="tk-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
@@ -146,7 +246,51 @@
   </table>
 </div>
 
-<div class="container mt-3">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <h3>Players Teamkill statistic by steam account</h3>
+  <table id="tk-stats-steam-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>Player</th>
+        <th>Teamkills</th>
+        <th>Missions</th>
+        <th>Kills/Missions</th>
+        <th>Name List</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for player, stats in tk_stats_steam.items() %}
+        <tr>
+          <td>{{ stats['name_last'] }}</td>
+          <td>{{ stats['kills'] }}</td>
+          <td>{{ stats['missions'] }}</td>
+          <td>{{ stats['k_m'] }}</td>
+          <td>
+            {% set salt = range(1, 10000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#tk_name_list_{{ salt }}" aria-expanded="false" aria-controls="tk_name_list_{{ salt }}">
+              Show all names
+            </button>
+            <div class="collapse" id="tk_name_list_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for name in stats['name_list'] %}
+                  <tr>
+                    <td>{{ name }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <h3>Squads Teamkill statistic</h3>
   <table id="team-tk-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
     <thead class="thead-dark">
@@ -171,7 +315,7 @@
 </div>
 {% endif %}
 
-<div class="container mt-3">
+<div class="container-fluid mt-3" style="max-width: 1400px;">
   <p>Олл райтс резёрвед, копирайт @ 2023</p>
 </div>
 
