@@ -5,12 +5,25 @@ import datetime
 import os
 import hashlib
 import re
+import gzip
+import heapq
 
-REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2021-01-01&older=2026-01-01'
+REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2020-01-01&older=2026-01-01'
 MISSION_STATS_FOLDER = './cache/mission_stats'
 MISSION_STATS_FILE = os.path.join(MISSION_STATS_FOLDER, 'missions_stats.json')
+TOTAL_STATS_FOLDER = './cache/total_stats'
+TOTAL_STATS_FILE = os.path.join(TOTAL_STATS_FOLDER, 'total_stats.json')
+
+VEHICLE_CLASS_COUNT_LIST = ['tank', 'apc', 'car', 'heli', 'plane', 'sea']
+
 
 app = Flask(__name__)
+
+
+def serialize_sets(obj):
+    if isinstance(obj, set):
+        return list(obj)
+    return obj
 
 
 def seconds_to_human(seconds):
@@ -20,7 +33,41 @@ def seconds_to_human(seconds):
     return time
 
 
-def process_ocap_file(data_url):
+def get_steam_data(d, value):
+    steam_id = None
+    name_list = set()
+    for k, v in d.items():
+        if value in v:
+            if steam_id is None:
+                steam_id = k
+            name_list.update(set(v))
+    if steam_id is not None:
+        d[steam_id] = name_list
+
+    return steam_id, name_list
+
+
+def create_steam_name_list():
+    file_path = "hashids.txt"
+
+    name_dict = {}
+
+    with open(file_path, encoding="utf-8") as file:
+        for line in file:
+            parts = line.strip().split("\t")
+            if len(parts) != 2:
+                continue
+            steam_id = parts[0]
+            name = parts[1]
+            if steam_id in name_dict:
+                name_dict[steam_id].append(name)
+            else:
+                name_dict[steam_id] = [name]
+
+    return name_dict
+
+
+def process_ocap_file(data_url, only_results=False):
     error_message = ''
     statistic_result = {
         'error_message': error_message,
@@ -60,20 +107,27 @@ def process_ocap_file(data_url):
         return statistic_result
 
     if os.path.exists(cache_file):
-        with open(cache_file, encoding="utf-8") as f:
-            data = json.load(f)
+        with gzip.open(cache_file, "rb") as f:
+            content = f.read()
+        data = json.loads(content.decode('utf-8'))
     else:
-        response = requests.get(data_url)
-        with open(cache_file, "wb") as temp_file:
+        headers = {"Accept-Encoding": "gzip"}
+        try:
+            response = requests.get(data_url, headers=headers)
+        except Exception as e:
+            print(data_url)
+            statistic_result['error_message'] = f'OCAP file was fail to load: {data_url}'
+            return statistic_result
+        with gzip.open(cache_file, "wb") as temp_file:
             temp_file.write(response.content)
-        with open(cache_file, encoding="utf-8") as f:
-            data = json.load(f)
+        data = json.loads(response.content.decode('utf-8'))
 
-    if os.path.exists(cache_missions):
-        with open(cache_missions, encoding="utf-8") as f:
-            missions_stats_data = json.load(f)
-    else:
-        missions_stats_data = {}
+    if not only_results:
+        if os.path.exists(cache_missions):
+            with open(cache_missions, encoding="utf-8") as f:
+                missions_stats_data = json.load(f)
+        else:
+            missions_stats_data = {}
 
     # Basic data for Mission statistic header
     mission_name = data.get('missionName')
@@ -112,7 +166,11 @@ def process_ocap_file(data_url):
             'id': entity['id'],
             'name': entity.get('name', 'no_name'),
             'side': entity.get('side', 'no_side'),
-            'group': entity.get("group", 'no_group')
+            'group': entity.get("group", 'no_group'),
+            'type': entity.get("type", 'unit'),  # unit/vehicle
+            # vehicle class: tank, apc, car, truck, static-mortar, static-weapon, heli, parachute, plane, sea
+            'class': entity.get("class", ''),
+            'is_player': entity.get('isPlayer', 0)  # 1/0
         }
 
         # As a player can connect and replace a bot after a while, trying to get and store updated value
@@ -124,6 +182,7 @@ def process_ocap_file(data_url):
                 player_data['name'] = updated_name if updated_name != '' else player_data['name']
                 updated_isplayer = entity['positions'][update_frame][5]
                 if updated_isplayer == 1:
+                    player_data['is_player'] = 1
                     break
             except IndexError:
                 pass
@@ -135,18 +194,23 @@ def process_ocap_file(data_url):
             if len(sides) == 0:
                 win = 1 if winner_side == player_data['side'] else 0
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0, 'tk': 0,
-                              'win': win})
+                              'win': win, 'frags': 0, 'vehicle_frags': 0})
             if len(sides) == 1 and player_data['side'] != sides[0]['name']:
                 win = 1 if winner_side == player_data['side'] else 0
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0, 'tk': 0,
-                              'win': win})
+                              'win': win, 'frags': 0, 'vehicle_frags': 0})
 
             if player_data['side'] == sides[0]['name']:
                 sides[0]['players'] += 1
             else:
                 sides[1]['players'] += 1
     # Adding a dummy player for handling null or empty statistic records
-    players.update({999: {'id': 999, 'name': 'unknown(null)', 'side': 'no_side', 'group': 'no_group'}})
+    players.update({999: {'id': 999, 'name': 'unknown(null)', 'side': 'no_side', 'group': 'no_group', 'type': 'unit'}})
+
+    # Adding a dummy side in case of there were no players on 2nd side
+    if len(sides) == 1:
+        sides.append({'name': players[999]['side'], 'ks': players[999]['name'], 'players': 0, 'tk': 0,
+                      'win': 0, 'frags': 0, 'vehicle_frags': 0})
 
     # Main kills statistic calculation
     for kill in kills:
@@ -158,32 +222,51 @@ def process_ocap_file(data_url):
         victim_side = players[victim_id].get('side', 'no side')
         victim_group = players[victim_id].get("group", 'no_group')
         killer_group = players[killer_id].get("group", 'no_group')
+        victim_type = players[victim_id].get("type", 'no_type')
+        victim_class = players[victim_id].get("class", '')
+        victim_isplayer = players[victim_id].get("is_player", 'non_player')
 
         # Teamkillers identification, incl. incorrect 'suicide' records handling
         teamkilla = "TK" if (killer_side == victim_side and killer_id != victim_id) else ""
 
         if killer_name not in frag_stats:
             frag_stats[killer_name] = {'frags': 0, 'side': killer_side, 'group': killer_group, 'teamkills': 0,
-                                       'victims': []}
+                                       'victims': [], 'bot_frags': 0, 'vehicle_frags': 0}
         victim_data = {
             'teamkilla': teamkilla,
             'time': seconds_to_human(kill['time']),
             'victim_name': victim_name,
             'distance': kill['distance'],
             'weapon': kill['weapon'],
-            'killer': killer_name
+            'killer': killer_name,
+            'type': victim_type,
+            'class': victim_class,
+            'is_player': victim_isplayer
         }
 
         # Frags increment and victim list extension logic
         if killer_id != victim_id:
             if killer_side != victim_side:
-                frag_stats[killer_name]['frags'] += 1
+                if victim_type == 'unit' and victim_isplayer == 1:
+                    frag_stats[killer_name]['frags'] += 1
+                    if killer_side == sides[0]['name']:
+                        sides[0]['frags'] += 1
+                    else:
+                        sides[1]['frags'] += 1
+                elif victim_type == 'vehicle' and victim_class in VEHICLE_CLASS_COUNT_LIST:
+                    frag_stats[killer_name]['vehicle_frags'] += 1
+                    if killer_side == sides[0]['name']:
+                        sides[0]['vehicle_frags'] += 1
+                    else:
+                        sides[1]['vehicle_frags'] += 1
+                else:
+                    frag_stats[killer_name]['bot_frags'] += 1
             frag_stats[killer_name]['victims'].append(victim_data)
 
         # Adding a record of death information for a victim
         if victim_name not in frag_stats:
             frag_stats[victim_name] = {'frags': 0, 'side': victim_side, 'group': victim_group, 'teamkills': 0,
-                                       'victims': []}
+                                       'victims': [], 'bot_frags': 0, 'vehicle_frags': 0}
         frag_stats[victim_name]['death_data'] = victim_data
 
         # Squad tag parsing logic for a main pattern "[<Squad>]<Player>", "~" is for recruits specific players on RBC
@@ -202,7 +285,8 @@ def process_ocap_file(data_url):
             killer_team = f'Odino4ki {killer_side}'
 
         if killer_team not in team_stats:
-            team_stats[killer_team] = {'frags': 0, 'side': killer_side, 'teamkills': 0, 'victims': []}
+            team_stats[killer_team] = {'frags': 0, 'side': killer_side, 'teamkills': 0, 'victims': [],
+                                       'bot_frags': 0, 'vehicle_frags': 0}
 
         # Teamkills statistic increment logic
         if killer_id != victim_id:
@@ -214,7 +298,12 @@ def process_ocap_file(data_url):
                 else:
                     sides[1]['tk'] += 1
             else:
-                team_stats[killer_team]['frags'] += 1
+                if victim_type == 'unit' and victim_isplayer == 1:
+                    team_stats[killer_team]['frags'] += 1
+                elif victim_type == 'vehicle' and victim_class in VEHICLE_CLASS_COUNT_LIST:
+                    team_stats[killer_team]['vehicle_frags'] += 1
+                else:
+                    team_stats[killer_team]['bot_frags'] += 1
             team_stats[killer_team]['victims'].append(victim_data)
 
     # KO revival calculation logic. Checking player frames for being knocked and then active again cases
@@ -240,6 +329,7 @@ def process_ocap_file(data_url):
 
     statistic_result = {
         'error_message': error_message,
+        'players': players,
         'frag_stats': frag_stats,
         'team_stats': team_stats,
         'ko_stats': ko_stats,
@@ -255,9 +345,176 @@ def process_ocap_file(data_url):
     with open(cache_results, "w") as f:
         json.dump(statistic_result, f)
 
-    missions_stats_data[replay_file_name] = sides
-    with open(cache_missions, "w") as f:
-        json.dump(missions_stats_data, f)
+    if not only_results:
+        missions_stats_data[replay_file_name] = sides
+        with open(cache_missions, "w") as f:
+            json.dump(missions_stats_data, f)
+
+    return statistic_result
+
+
+def process_total_stats():
+    # Getting replay list data
+    response = requests.get(REPLAY_LIST_URL)
+    replay_list_data = response.json()
+
+    results_folder = './cache/results'
+    tk_stats = {}
+    tk_stats_steam = {}
+    team_tk_stats = {}
+    frag_stats = {}
+    frag_stats_steam = {}
+    team_frag_stats = {}
+    error_message = ''
+
+    os.makedirs(TOTAL_STATS_FOLDER, exist_ok=True)
+
+    if os.path.exists(TOTAL_STATS_FILE):
+        with open(TOTAL_STATS_FILE, encoding="utf-8") as f:
+            statistic_result = json.load(f)
+        if statistic_result['cache_count'] == len(replay_list_data):
+            return statistic_result
+
+    player_steam_dict = create_steam_name_list()
+
+    for replay in replay_list_data:
+        if replay.get('mission_duration', 0) > 1800 and replay.get('tag', '') in ['tvt', 'TvT', 'tvt_ii', 'TvT_II']:
+            file_url = 'https://ocap.red-bear.ru/data/' + replay['filename'].strip()
+            mission_url_hash = hashlib.md5(file_url.encode()).hexdigest()
+            cache_results = os.path.join(results_folder, mission_url_hash)
+            if os.path.exists(cache_results):
+                with open(cache_results, encoding="utf-8") as f:
+                    statistic_result = json.load(f)
+            else:
+                error_message = 'Some missions OCAP replays are not processed still, please do it on the home page'
+                break
+
+            # ST.to Dw. legacy statistic handling
+            # to_delete = []
+            player_to_add = []
+            for player, stats in statistic_result['frag_stats'].items():
+                if 'St.' in player or 'Dw.' in player:
+                    new_name = player.replace('St.', '[StDw]')
+                    new_name = new_name.replace('Dw.', '[StDw]')
+                    player_to_add.append({new_name: stats})
+                    # to_delete.append(player)
+            # for player in to_delete:
+            #     del statistic_result['frag_stats'][player]
+            for player in player_to_add:
+                statistic_result['frag_stats'].update(player)
+            team_to_add = []
+            for team, stats in statistic_result['team_stats'].items():
+                if team == 'St' or team == 'Dw':
+                    team_to_add.append(stats)
+            if len(team_to_add) > 0:
+                new_stats = {'teamkills': 0, 'frags': 0, 'bot_frags': 0, 'vehicle_frags': 0, 'side': 'no_side',
+                             'victims': []}
+
+                for team in team_to_add:
+                    for k, v in team.items():
+                        if k in new_stats:
+                            new_stats[k] += v
+                statistic_result['team_stats']['StDw'] = new_stats
+
+            # By SteamID. Kiberkotlets and Teamkills statistic aggregation
+            for player, stats in statistic_result['frag_stats'].items():
+                player_name = player.replace(" ", "")
+
+                steam_id, names = get_steam_data(player_steam_dict, player)
+
+                if steam_id is not None:
+                    if steam_id not in tk_stats_steam:
+                        tk_stats_steam[steam_id] = {'kills': 0, 'missions': 0, 'name_list': set()}
+                    tk_stats_steam[steam_id]['kills'] += stats['teamkills']
+                    tk_stats_steam[steam_id]['missions'] += 1
+                    tk_stats_steam[steam_id]['name_list'].add(player)
+                    tk_stats_steam[steam_id]['name_last'] = player_name
+
+                    if steam_id not in frag_stats_steam:
+                        frag_stats_steam[steam_id] = {'kills': 0, 'missions': 0, 'deaths': 0, 'bot_frags': 0,
+                                                      'vehicle_frags': 0, 'name_list': set()}
+                    frag_stats_steam[steam_id]['kills'] += stats['frags']
+                    frag_stats_steam[steam_id]['bot_frags'] += stats['bot_frags']
+                    frag_stats_steam[steam_id]['vehicle_frags'] += stats['vehicle_frags']
+                    frag_stats_steam[steam_id]['missions'] += 1
+                    frag_stats_steam[steam_id]['name_list'].add(player)
+                    frag_stats_steam[steam_id]['name_last'] = player_name
+                    if 'death_data' in stats:
+                        frag_stats_steam[steam_id]['deaths'] += 1
+
+                # By nickname. Kiberkotlets and Teamkills statistic aggregation
+                if player_name not in tk_stats:
+                    tk_stats[player_name] = {'kills': 0, 'missions': 0}
+                tk_stats[player_name]['kills'] += stats['teamkills']
+                tk_stats[player_name]['missions'] += 1
+
+                if player_name not in frag_stats:
+                    frag_stats[player_name] = {'kills': 0, 'missions': 0, 'deaths': 0, 'bot_frags': 0,
+                                               'vehicle_frags': 0, 'victims': {}}
+                frag_stats[player_name]['kills'] += stats['frags']
+                frag_stats[player_name]['bot_frags'] += stats['bot_frags']
+                frag_stats[player_name]['vehicle_frags'] += stats['vehicle_frags']
+                frag_stats[player_name]['missions'] += 1
+                for victim in stats['victims']:
+                    if victim['victim_name'] not in frag_stats[player_name]['victims']:
+                        frag_stats[player_name]['victims'][victim['victim_name']] = 0
+                    frag_stats[player_name]['victims'][victim['victim_name']] += 1
+                if 'death_data' in stats:
+                    frag_stats[player_name]['deaths'] += 1
+
+            # Kiber squads players and Squad teamkills statistic aggregation
+            for team, stats in statistic_result['team_stats'].items():
+                team_name = re.sub('[^A-Za-z0-9-]+', '', team)
+                if team_name not in team_tk_stats:
+                    team_tk_stats[team_name] = {'kills': 0, 'missions': 0}
+                team_tk_stats[team_name]['kills'] += stats['teamkills']
+                team_tk_stats[team_name]['missions'] += 1
+
+                if team_name not in team_frag_stats:
+                    team_frag_stats[team_name] = {'kills': 0, 'missions': 0, 'bot_frags': 0, 'vehicle_frags': 0,
+                                                  'victims': {}}
+                team_frag_stats[team_name]['kills'] += stats['frags']
+                team_frag_stats[team_name]['bot_frags'] += stats['bot_frags']
+                team_frag_stats[team_name]['vehicle_frags'] += stats['vehicle_frags']
+                team_frag_stats[team_name]['missions'] += 1
+                for victim in stats['victims']:
+                    if victim['victim_name'] not in team_frag_stats[team_name]['victims']:
+                        team_frag_stats[team_name]['victims'][victim['victim_name']] = 0
+                    team_frag_stats[team_name]['victims'][victim['victim_name']] += 1
+
+    # Kills/missions and Kills/deaths statistic adding
+    for stat_dict in [tk_stats, team_tk_stats, frag_stats, team_frag_stats, frag_stats_steam, tk_stats_steam]:
+        to_delete = []
+        for item, stat in stat_dict.items():
+            if stat['missions'] > 28:
+                stat['k_m'] = round(stat['kills'] / stat['missions'], 3)
+                if stat_dict == frag_stats or stat_dict == frag_stats_steam:
+                    deaths = stat['deaths'] if stat['deaths'] > 0 else 1
+                    stat['k_d'] = round(stat['kills'] / deaths, 3)
+            else:
+                to_delete.append(item)
+        for key in to_delete:
+            del stat_dict[key]
+
+    # sorted(stats['victims'].items(), key=lambda item: item[1], reverse=True)
+    for stat_dict in [frag_stats, team_frag_stats]:
+        for name, stats in stat_dict.items():
+            stats['victims'] = heapq.nlargest(20, stats['victims'].items(), key=lambda x: x[1])
+
+    statistic_result = {
+        'cache_count': len(replay_list_data),
+        'error_message': error_message,
+        'frag_stats': frag_stats,
+        'team_frag_stats': team_frag_stats,
+        'frag_stats_steam': frag_stats_steam,
+        'team_tk_stats': team_tk_stats,
+        'tk_stats_steam': tk_stats_steam,
+        'tk_stats': tk_stats
+    }
+
+    # Calculated statistic storing in cache
+    with open(TOTAL_STATS_FILE, "w") as f:
+        json.dump(statistic_result, f, default=serialize_sets)
 
     return statistic_result
 
@@ -311,89 +568,7 @@ def index():
 
 @app.route('/total', methods=['GET'])
 def total():
-    # Getting replay list data
-    response = requests.get(REPLAY_LIST_URL)
-    replay_list_data = response.json()
-
-    results_folder = './cache/results'
-    tk_stats = {}
-    team_tk_stats = {}
-    frag_stats = {}
-    team_frag_stats = {}
-    error_message = ''
-
-    for i, replay in enumerate(replay_list_data):
-        if replay.get('mission_duration', 0) > 1800 and replay.get('tag', '') in ['tvt', 'TvT', 'tvt_ii', 'TvT_II']:
-            file_url = 'https://ocap.red-bear.ru/data/' + replay['filename'].strip()
-            mission_url_hash = hashlib.md5(file_url.encode()).hexdigest()
-            cache_results = os.path.join(results_folder, mission_url_hash)
-            if os.path.exists(cache_results):
-                with open(cache_results, encoding="utf-8") as f:
-                    statistic_result = json.load(f)
-            else:
-                error_message = 'Some missions OCAP replays are not processed still, please do it on the home page'
-                break
-
-            # ST.to Dw. legacy statistic handling
-            # to_delete = []
-            player_to_add = []
-            for player, stats in statistic_result['frag_stats'].items():
-                if 'St.' in player or 'Dw.' in player:
-                    new_name = player.replace('St.', '[StDw]')
-                    new_name = new_name.replace('Dw.', '[StDw]')
-                    player_to_add.append({new_name: stats})
-                    # to_delete.append(player)
-            # for player in to_delete:
-            #     del statistic_result['frag_stats'][player]
-            for player in player_to_add:
-                statistic_result['frag_stats'].update(player)
-            team_to_add = []
-            for team, stats in statistic_result['team_stats'].items():
-                if team == 'St' or team == 'Dw':
-                    team_to_add.append(stats)
-            if len(team_to_add) > 0:
-                new_stats = {'teamkills': 0, 'frags': 0}
-                for team in team_to_add:
-                    for k, v in team.items():
-                        if k in new_stats:
-                            new_stats[k] += v
-                statistic_result['team_stats']['StDw'] = new_stats
-
-            # Kiberkotlets and Teamkills statistic aggregation
-            for player, stats in statistic_result['frag_stats'].items():
-                player_name = player.replace(" ", "")
-                if player_name not in tk_stats:
-                    tk_stats[player_name] = {'kills': 0, 'missions': 0}
-                tk_stats[player_name]['kills'] += stats['teamkills']
-                tk_stats[player_name]['missions'] += 1
-
-                if player_name not in frag_stats:
-                    frag_stats[player_name] = {'kills': 0, 'missions': 0, 'deaths': 0}
-                frag_stats[player_name]['kills'] += stats['frags']
-                frag_stats[player_name]['missions'] += 1
-                if 'death_data' in stats:
-                    frag_stats[player_name]['deaths'] += 1
-
-            # Kiber squads players and Squad teamkills statistic aggregation
-            for team, stats in statistic_result['team_stats'].items():
-                team_name = re.sub('[^A-Za-z0-9-]+', '', team)
-                if team_name not in team_tk_stats:
-                    team_tk_stats[team_name] = {'kills': 0, 'missions': 0}
-                team_tk_stats[team_name]['kills'] += stats['teamkills']
-                team_tk_stats[team_name]['missions'] += 1
-
-                if team_name not in team_frag_stats:
-                    team_frag_stats[team_name] = {'kills': 0, 'missions': 0}
-                team_frag_stats[team_name]['kills'] += stats['frags']
-                team_frag_stats[team_name]['missions'] += 1
-
-    # Kills/missions and Kills/deaths statistic adding
-    for stat_dict in [tk_stats, team_tk_stats, frag_stats, team_frag_stats]:
-        for item, stat in stat_dict.items():
-            stat['k_m'] = round(stat['kills'] / stat['missions'], 3) if stat['missions'] > 20 else 0
-            if stat_dict == frag_stats:
-                deaths = stat['deaths'] if stat['deaths'] > 0 else 1
-                stat['k_d'] = round(stat['kills'] / deaths, 3) if stat['missions'] > 20 else 0
+    stats_report = process_total_stats()
 
     # loading modal window text definition
     loading_message = "Loading..."
@@ -401,11 +576,13 @@ def total():
     return render_template(
         'index_total.html',
         loading_message=loading_message,
-        error_message=error_message,
-        tk_stats=tk_stats,
-        team_tk_stats=team_tk_stats,
-        frag_stats=frag_stats,
-        team_frag_stats=team_frag_stats
+        error_message=stats_report['error_message'],
+        tk_stats=stats_report['tk_stats'],
+        tk_stats_steam=stats_report['tk_stats_steam'],
+        team_tk_stats=stats_report['team_tk_stats'],
+        frag_stats=stats_report['frag_stats'],
+        frag_stats_steam=stats_report['frag_stats_steam'],
+        team_frag_stats=stats_report['team_frag_stats']
     )
 
 
