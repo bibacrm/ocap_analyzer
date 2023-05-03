@@ -70,6 +70,7 @@
   <form method="post" id="ocap_url_form" class="small">
     <label for="ocap_url">Enter file URL:</label>
     <input type="text" id="ocap_url" name="ocap_url">
+    <input type="hidden" id="tag" name="tag">
     <input type="submit" value="Submit">
   </form>
   {% if error_message != '' %}
@@ -116,6 +117,7 @@
           <td class="replay_id link">
             {{ replay['id'] }}
             <div class="hide">{{ replay['filename'] }}</div>
+            <p class="hide">{{ replay['tag'] }}</p>
           </td>
           <td>{{ replay['mission_name'] }}</td>
           <td>
@@ -397,9 +399,11 @@
   const table = document.getElementById('ocap-list-table');
   table.addEventListener('click', function(event) {
     if (event.target.classList.contains('replay_id')) {
+      var tag = event.target.querySelector('p').textContent;
       var divText = event.target.querySelector('div').textContent;
       var file_name_url = "https://ocap.red-bear.ru/data/" + divText.trim()
       $('#ocap_url').val(file_name_url);
+      $('#tag').val(tag);
       $('#ocap_url_form').submit();
     }
   });

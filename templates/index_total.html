@@ -65,7 +65,7 @@
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
   <h5>маид бай STELS</h5>
-  <h5>TVT and TVT2 total statistic, starting 01.01.2020, missions 30min+</h5>
+  <h5>TVT and TVT2 total statistic based on {{ cache_count }} missions, starting 01.01.2020, duration 30min+. </h5>
   {% if error_message != '' %}
   <h3>{{ error_message }}</h3>
   {% endif %}
@@ -313,6 +313,35 @@
       </tbody>
   </table>
 </div>
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <h3>KS statistic</h3>
+  <table id="ks-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+    <thead class="thead-dark">
+      <tr>
+        <th>Name</th>
+        <th>Win</th>
+        <th>Lost</th>
+        <th>Draw</th>
+        <th>Total</th>
+        <th>Win Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+        {% for ks_name, stats in ks_win_stat.items() %}
+        <tr>
+          <td>{{ ks_name }}</td>
+          <td>{{ stats['win'] }}</td>
+          <td>{{ stats['lost'] }}</td>
+          <td>{{ stats['draw'] }}</td>
+          <td>{{ stats['total'] }}</td>
+          <td>{{ stats['win_rate'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+  </table>
+</div>
+
 {% endif %}
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
