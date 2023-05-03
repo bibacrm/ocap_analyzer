@@ -20,7 +20,7 @@ User=root
 Group=root
 WorkingDirectory=/root/ocap_stats
 Environment="PATH=/usr/bin"
-ExecStart=gunicorn main:app -b 0.0.0.0:80 --log-level=debug --timeout 90 --workers 5
+ExecStart=gunicorn main:app -b 0.0.0.0:80 --log-level=debug --timeout 90 --workers 5 --preload
 Restart=always
 
 [Install]
