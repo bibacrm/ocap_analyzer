@@ -3,7 +3,7 @@
 - Flask based python web app.
 - Downloads a json OCAP replay file, stores it in /cache folder, collects statistic(stores in /cache/results folder also), generates Jinja based web page
 - Checked via Python 3.8
-- dependencies to install - 'pip install flask requests'
+- dependencies to install - 'pip install flask requests apscheduler tqdm'
 
 ## Installation on VM (simple CentOS example, via root user)
 1. copy files to some folder, e.g. /root/ocap_stats/
