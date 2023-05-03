@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from apscheduler.schedulers.background import BackgroundScheduler
 import json
 import requests
 import datetime
@@ -7,6 +8,9 @@ import hashlib
 import re
 import gzip
 import heapq
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2020-01-01&older=2026-01-01'
 MISSION_STATS_FOLDER = './cache/mission_stats'
@@ -14,10 +18,13 @@ MISSION_STATS_FILE = os.path.join(MISSION_STATS_FOLDER, 'missions_stats.json')
 TOTAL_STATS_FOLDER = './cache/total_stats'
 TOTAL_STATS_FILE = os.path.join(TOTAL_STATS_FOLDER, 'total_stats.json')
 
+MISSION_TAGS_FOR_TOTAL_STATS = ['tvt', 'TvT', 'tvt_ii', 'TvT_II']
 VEHICLE_CLASS_COUNT_LIST = ['tank', 'apc', 'car', 'heli', 'plane', 'sea']
 
-
 app = Flask(__name__)
+
+scheduler = BackgroundScheduler()
+scheduler.start()
 
 
 def serialize_sets(obj):
@@ -67,7 +74,7 @@ def create_steam_name_list():
     return name_dict
 
 
-def process_ocap_file(data_url, only_results=False):
+def process_ocap_file(data_url, only_results=False, tag=None):
     error_message = ''
     statistic_result = {
         'error_message': error_message,
@@ -79,6 +86,7 @@ def process_ocap_file(data_url, only_results=False):
         'mission_author': "",
         'mission_duration': "",
         'sides': {},
+        'tag': tag,
         'winner': ''
     }
 
@@ -194,11 +202,11 @@ def process_ocap_file(data_url, only_results=False):
             if len(sides) == 0:
                 win = 1 if winner_side == player_data['side'] else 0
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0, 'tk': 0,
-                              'win': win, 'frags': 0, 'vehicle_frags': 0})
+                              'win': win, 'frags': 0, 'vehicle_frags': 0, 'tag': tag})
             if len(sides) == 1 and player_data['side'] != sides[0]['name']:
                 win = 1 if winner_side == player_data['side'] else 0
                 sides.append({'name': player_data['side'], 'ks': player_data['name'], 'players': 0, 'tk': 0,
-                              'win': win, 'frags': 0, 'vehicle_frags': 0})
+                              'win': win, 'frags': 0, 'vehicle_frags': 0, 'tag': tag})
 
             if player_data['side'] == sides[0]['name']:
                 sides[0]['players'] += 1
@@ -338,6 +346,7 @@ def process_ocap_file(data_url, only_results=False):
         'mission_author': mission_author,
         'mission_duration': mission_duration,
         'sides': sides,
+        'tag': tag,
         'winner': winner
     }
 
@@ -357,6 +366,11 @@ def process_total_stats():
     # Getting replay list data
     response = requests.get(REPLAY_LIST_URL)
     replay_list_data = response.json()
+    tvt_missions_count = sum(
+        1 for v in replay_list_data if (v['tag'] in MISSION_TAGS_FOR_TOTAL_STATS and v['mission_duration'] > 1800)
+    )
+
+    logging.info(f'Start processing total statistic')
 
     results_folder = './cache/results'
     tk_stats = {}
@@ -372,13 +386,14 @@ def process_total_stats():
     if os.path.exists(TOTAL_STATS_FILE):
         with open(TOTAL_STATS_FILE, encoding="utf-8") as f:
             statistic_result = json.load(f)
-        if statistic_result['cache_count'] == len(replay_list_data):
+        if statistic_result['cache_count'] == tvt_missions_count:
+            logging.info("Cached total statistic is up to date, no need to refresh it")
             return statistic_result
 
     player_steam_dict = create_steam_name_list()
 
     for replay in replay_list_data:
-        if replay.get('mission_duration', 0) > 1800 and replay.get('tag', '') in ['tvt', 'TvT', 'tvt_ii', 'TvT_II']:
+        if replay.get('mission_duration', 0) > 1800 and replay.get('tag', '') in MISSION_TAGS_FOR_TOTAL_STATS:
             file_url = 'https://ocap.red-bear.ru/data/' + replay['filename'].strip()
             mission_url_hash = hashlib.md5(file_url.encode()).hexdigest()
             cache_results = os.path.join(results_folder, mission_url_hash)
@@ -387,6 +402,7 @@ def process_total_stats():
                     statistic_result = json.load(f)
             else:
                 error_message = 'Some missions OCAP replays are not processed still, please do it on the home page'
+                logging.error(error_message)
                 break
 
             # ST.to Dw. legacy statistic handling
@@ -501,35 +517,75 @@ def process_total_stats():
         for name, stats in stat_dict.items():
             stats['victims'] = heapq.nlargest(20, stats['victims'].items(), key=lambda x: x[1])
 
+    # KS statistic
+    with open(MISSION_STATS_FILE, encoding="utf-8") as f:
+        missions_stats_data = json.load(f)
+
+    ks_list = set()
+    ks_win_stat = {}
+
+    for mission, stat in missions_stats_data.items():
+        if len(stat) > 1:
+            if stat[0]['tag'] in MISSION_TAGS_FOR_TOTAL_STATS:
+                for side in stat:
+                    ks_list.add(side['ks'])
+
+    for ks_name in ks_list:
+        for mission, stat in missions_stats_data.items():
+            if len(stat) > 1:
+                if stat[0]['tag'] in MISSION_TAGS_FOR_TOTAL_STATS:
+                    for side in stat:
+                        if ks_name in side['ks']:
+                            if ks_name not in ks_win_stat:
+                                ks_win_stat[ks_name] = {'win': 0, 'lost': 0, 'draw': 0}
+                            if side['win'] == 1:
+                                ks_win_stat[ks_name]['win'] += 1
+                            elif stat[0]['win'] == 0 and stat[1]['win'] == 0:
+                                ks_win_stat[ks_name]['draw'] += 1
+                            else:
+                                ks_win_stat[ks_name]['lost'] += 1
+
+    for ks_name, stats in ks_win_stat.items():
+        stats['total'] = stats['win'] + stats['lost'] + stats['draw']
+        stats['win_rate'] = round(stats['win'] / stats['total'], 3) if stats['total'] > 4 else 0
+
     statistic_result = {
-        'cache_count': len(replay_list_data),
+        'cache_count': tvt_missions_count,
         'error_message': error_message,
         'frag_stats': frag_stats,
         'team_frag_stats': team_frag_stats,
         'frag_stats_steam': frag_stats_steam,
         'team_tk_stats': team_tk_stats,
         'tk_stats_steam': tk_stats_steam,
-        'tk_stats': tk_stats
+        'tk_stats': tk_stats,
+        'ks_win_stat': ks_win_stat
     }
 
     # Calculated statistic storing in cache
     with open(TOTAL_STATS_FILE, "w") as f:
         json.dump(statistic_result, f, default=serialize_sets)
+    logging.info("Total statistic cache data has been updated")
 
     return statistic_result
+
+
+scheduler.add_job(process_total_stats, 'interval', hours=1)
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     data_url = None
+    tag = None
     # Getting submitted form parameter with a direct OCAP replay json file URL
     if request.method == 'POST':
         data_url = request.form['ocap_url']
-    stats_report = process_ocap_file(data_url)
+        tag = request.form['tag']
 
     # Getting replay list data
     response = requests.get(REPLAY_LIST_URL)
     replay_list_data = response.json()
+
+    stats_report = process_ocap_file(data_url, tag=tag)
 
     # Getting cached mission stats data
     if os.path.exists(MISSION_STATS_FILE):
@@ -577,12 +633,14 @@ def total():
         'index_total.html',
         loading_message=loading_message,
         error_message=stats_report['error_message'],
+        cache_count=stats_report['cache_count'],
         tk_stats=stats_report['tk_stats'],
         tk_stats_steam=stats_report['tk_stats_steam'],
         team_tk_stats=stats_report['team_tk_stats'],
         frag_stats=stats_report['frag_stats'],
         frag_stats_steam=stats_report['frag_stats_steam'],
-        team_frag_stats=stats_report['team_frag_stats']
+        team_frag_stats=stats_report['team_frag_stats'],
+        ks_win_stat=stats_report['ks_win_stat']
     )
 
 

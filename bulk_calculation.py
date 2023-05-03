@@ -14,13 +14,17 @@ replay_list_data = response.json()
 total = len(replay_list_data)
 
 
-file_list = ['https://ocap.red-bear.ru/data/' + replay['filename'].strip() for replay in replay_list_data]
+file_list = {
+    'https://ocap.red-bear.ru/data/' + replay['filename'].strip(): replay['tag'] for replay in replay_list_data
+}
 
 max_threads = 6
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
     results = []
-    future_to_file = {executor.submit(process_ocap_file, file_url, True): file_url for file_url in file_list}
+    future_to_file = {
+        executor.submit(process_ocap_file, file_url, True, tag): file_url for file_url, tag in file_list.items()
+    }
     with tqdm(total=len(file_list)) as pbar:
         for future in concurrent.futures.as_completed(future_to_file):
             file = future_to_file[future]
@@ -66,6 +70,7 @@ for i, replay in enumerate(replay_list_data):
 # KS statistic
 with open(MISSION_STATS_FILE, encoding="utf-8") as f:
     missions_stats_data = json.load(f)
+
 
 STELS_KS = {'win': 0, 'lost': 0, 'draw': 0}
 
