@@ -23,7 +23,7 @@ max_threads = 6
 with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
     results = []
     future_to_file = {
-        executor.submit(process_ocap_file, file_url, True, tag): file_url for file_url, tag in file_list.items()
+        executor.submit(process_ocap_file, file_url, True, tag, replay_list_data): file_url for file_url, tag in file_list.items()
     }
     with tqdm(total=len(file_list)) as pbar:
         for future in concurrent.futures.as_completed(future_to_file):
