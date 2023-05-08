@@ -15,6 +15,9 @@
         font-size: 0.8rem;
         border-radius: 0.25rem;
       }
+    .cell-link{
+      color: #1111cd;
+    }
     .link {
       color: blue;
       text-decoration: underline;
@@ -65,7 +68,16 @@
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
   <h5>маид бай STELS</h5>
-  <h5>TVT and TVT2 total statistic based on {{ cache_count }} missions, starting 01.01.2020, duration 30min+. </h5>
+  <h5><a href="/">Mission statistic</a></h5>
+
+  {% if tag == "tvt" %}
+  <h5><a href="/total_if">Total IF statistic</a></h5>
+  <h5>TVT and TVT2 total statistic based on {{ cache_count }} missions, starting 01.01.2020, duration 30min+ </h5>
+  {% else %}
+  <h5><a href="/total_tvt">Total TVT 1&2 statistic</a></h5>
+  <h5>IF total statistic based on {{ cache_count }} missions, starting 01.01.2020, duration 5min+ </h5>
+  {% endif %}
+
   {% if error_message != '' %}
   <h3>{{ error_message }}</h3>
   {% endif %}
@@ -90,7 +102,7 @@
     <tbody>
         {% for player, stats in frag_stats.items() %}
         <tr>
-          <td>{{ player }}</td>
+          <td><a href="/total_{{ tag }}/personal?player_name={{ player }}" class="cell-link">{{ player }}</a></td>
           <td>{{ stats['kills'] }}</td>
           <td>{{ stats['missions'] }}</td>
           <td>{{ stats['k_m'] }}</td>
@@ -108,7 +120,7 @@
                 <tbody>
                 {% for name, count in stats['victims']: %}
                   <tr>
-                    <td>{{ name }}</td>
+                    <td><a href="/total_{{ tag }}/personal?player_name={{ name }}" class="cell-link">{{ name }}</a></td>
                     <td>{{ count }}</td>
                   </tr>
                 {% endfor %}

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ARMA3 TVT Attendance</title>
+  <style>
+    .small {
+        font-size: 8;
+      }
+    .hide {
+        display: none;
+      }
+    .btn_small {
+        padding: 0.1;
+        font-size: 0.8rem;
+        border-radius: 0.25rem;
+      }
+    .cell-link{
+      color: #1111cd;
+    }
+    .link {
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .link:hover {
+      color: red;
+    }
+    .header {
+      color: red;
+    }
+    .tooltip-inner {
+    white-space: pre-wrap;
+    }
+    table,
+    th,
+    td {
+      font-size: 14px;
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.23/css/dataTables.bootstrap4.min.css">
+
+  <script src="https://cdn.rawgit.com/rainabba/jquery-table2excel/1.1.0/dist/jquery.table2excel.min.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.0.0/css/buttons.dataTables.min.css">
+  <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.0/js/dataTables.buttons.min.js"></script>
+  <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.0/js/buttons.colVis.min.js"></script>
+
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+  <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
+
+</head>
+
+<body>
+
+<!-- Loading Modal -->
+<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Fog the page when the modal is shown -->
+<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
+
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
+  <h5>маид бай STELS</h5>
+  <h5>Attendance statistic</h5>
+
+  <h1>{{ player_name }}</h1>
+  {% if error_message != '' %}
+  <h3>{{ error_message }}</h3>
+  {% endif %}
+</div>
+
+{% if error_message == '' %}
+<div class="container-fluid mt-3" style="max-width: 1800px;">
+      <h3>TVT1 Mission attendance statistic</h3>
+      <button id="export-btn" class="btn btn-primary" style="margin-bottom: 3px;">Export to Excel (WYSIWYG)</button>
+      <table id="attendance-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Date</th>
+            <th data-sortable="false">Mission</th>
+            <th data-sortable="false">T</th>
+            <th data-sortable="false">Day</th>
+            <th data-sortable="false">Time</th>
+            <th data-sortable="false">Total</th>
+            {% for team in rotation_1_1 %}
+              <th data-sortable="false" style="font-weight: 700; color: lightsalmon">{{ team }}</th>
+            {% endfor %}
+            <th data-sortable="false"></th>
+            {% for team in rotation_1_2 %}
+              <th data-sortable="false" style="font-weight: 700; color: lightblue ">{{ team }}</th>
+            {% endfor %}
+              <th data-sortable="false" style="font-weight: 700;">Other</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for mission, stats in attendance.items() %}
+              {% if stats['tag'] == '1' %}
+                <tr>
+                  <td>{{ stats['date'] }}</td>
+                  <td>{{ stats['mission_name'] }}</td>
+                  <td>{{ stats['tag'] }}</td>
+                  <td>{{ stats['weekday_name'] }}</td>
+                  <td>{{ stats['mission_time'] }}</td>
+                  <td>{{ stats['players_total'] }}</td>
+                  {% for team, count in stats['rotation']['1'].items() %}
+                    <td>{{ count }}</td>
+                  {% endfor %}
+                  <td></td>
+                  {% for team, count in stats['rotation']['2'].items() %}
+                    <td>{{ count }}</td>
+                  {% endfor %}
+
+                  <td>
+                    {% set salt = range(1, 10000) | random %}
+                    <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#nonrotation_{{ salt }}" aria-expanded="false" aria-controls="nonrotation_{{ salt }}">
+                      Show
+                    </button>
+                    <div class="collapse" id="nonrotation_{{ salt }}">
+                      <div class="card card-body">
+                        <ul>
+                        {% for team, count in stats['non_rotation'].items() %}
+                            <li>{{ count }} : {{ team }}</li>
+                        {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+      </table>
+
+</div>
+
+<div class="container-fluid mt-3" style="max-width: 1800px;">
+      <h3>TVT2 Mission attendance statistic</h3>
+      <button id="export-btn-2" class="btn btn-primary" style="margin-bottom: 3px;">Export to Excel (WYSIWYG)</button>
+      <table id="attendance-stats-table-2" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Date</th>
+            <th data-sortable="false">Mission</th>
+            <th data-sortable="false">T</th>
+            <th data-sortable="false">Day</th>
+            <th data-sortable="false">Time</th>
+            <th data-sortable="false">Total</th>
+            {% for team in rotation_2_1 %}
+              <th data-sortable="false" style="font-weight: 700; color: lightsalmon">{{ team }}</th>
+            {% endfor %}
+            <th data-sortable="false"></th>
+            {% for team in rotation_2_2 %}
+              <th data-sortable="false" style="font-weight: 700; color: lightblue ">{{ team }}</th>
+            {% endfor %}
+              <th data-sortable="false" style="font-weight: 700;">Other</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for mission, stats in attendance.items() %}
+              {% if stats['tag'] == '2' %}
+                <tr>
+                  <td>{{ stats['date'] }}</td>
+                  <td>{{ stats['mission_name'] }}</td>
+                  <td>{{ stats['tag'] }}</td>
+                  <td>{{ stats['weekday_name'] }}</td>
+                  <td>{{ stats['mission_time'] }}</td>
+                  <td>{{ stats['players_total'] }}</td>
+                  {% for team, count in stats['rotation']['1'].items() %}
+                    <td>{{ count }}</td>
+                  {% endfor %}
+                  <td></td>
+                  {% for team, count in stats['rotation']['2'].items() %}
+                    <td>{{ count }}</td>
+                  {% endfor %}
+
+                  <td>
+                    {% set salt = range(1, 10000) | random %}
+                    <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#nonrotation_2_{{ salt }}" aria-expanded="false" aria-controls="nonrotation_2_{{ salt }}">
+                      Show
+                    </button>
+                    <div class="collapse" id="nonrotation_2_{{ salt }}">
+                      <div class="card card-body">
+                        <ul>
+                        {% for team, count in stats['non_rotation'].items() %}
+                            <li>{{ count }} : {{ team }}</li>
+                        {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+      </table>
+
+</div>
+
+
+{% endif %}
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <p>Олл райтс резёрвед, копирайт @ 2023</p>
+</div>
+
+<script>
+  $(document).ready(function() {
+    $('.stats-table').DataTable({
+      "paging": true,
+      "lengthChange": true,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "order": [[ 0, "desc" ]],
+      dom: 'B<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rtip',
+        buttons: [
+            {
+                extend: 'colvis',
+                columns: ':gt(-2)' // Only include the last 4 columns
+            },
+            'excel'
+        ]
+    });
+  });
+</script>
+
+<script>
+$(document).ready(function() {
+  $('#export-btn').click(function() {
+    $('#attendance-stats-table').table2excel({
+      filename: 'attendance_tvt_1.xls'
+    });
+  });
+  $('#export-btn-2').click(function() {
+    $('#attendance-stats-table-2').table2excel({
+      filename: 'attendance_tvt_2.xls'
+    });
+  });
+});
+</script>
+
+</body>
+</html>

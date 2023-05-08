@@ -15,12 +15,15 @@
         font-size: 0.8rem;
         border-radius: 0.25rem;
       }
-    .link {
+    .cell-link{
+      color: #1111cd;
+    }
+    .link{
       color: blue;
       text-decoration: underline;
       cursor: pointer;
     }
-    .link:hover {
+    .link:hover{
       color: red;
     }
     .header {
@@ -64,7 +67,10 @@
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
-  <h5><a href="/total">маид бай STELS</a></h5>
+  <h5>маид бай STELS</h5>
+  <h5><a href="/total_tvt">Total TVT 1&2 statistic</a></h5>
+  <h5><a href="/total_if">Total IF statistic</a></h5>
+  <h5><a href="/attendance?tag=tvt">TVT attendance</a></h5>
   <h5>Statistic by mission, starting 01.01.2020</h5>
 
   <form method="post" id="ocap_url_form" class="small">
@@ -196,7 +202,7 @@
     <tbody>
         {% for player, stats in stat_data.items() %}
         <tr>
-          <td>{{ player }}</td>
+          <td><a href="/total_{{ tag }}/personal?player_name={{ player }}" class="cell-link">{{ player }}</a></td>
           <td>{{ stats['frags'] }}</td>
           {% if stats['side'] == "WEST" %}
           <td style="color: blue;">{{ stats['side'] }}</td>
@@ -231,7 +237,7 @@
                       <td style="color:red">{{ victim['teamkilla'] }}</td>
                       <td>{{ victim['class'] }}</td>
                       <td>{{ victim['time'] }}</td>
-                      <td>{{ victim['victim_name'] }}</td>
+                      <td><a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a></td>
                       <td>{{ victim['distance'] }}m</td>
                       <td>{{ victim['weapon'] }}</td>
                     </tr>
@@ -308,8 +314,8 @@
                     <td style="color:red">{{ victim['teamkilla'] }}</td>
                     <td>{{ victim['class'] }}</td>
                     <td>{{ victim['time'] }}</td>
-                    <td>{{ victim['victim_name'] }}</td>
-                    <td>{{ victim['killer'] }}</td>
+                    <td><a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a></td>
+                    <td><a href="/total_{{ tag }}/personal?player_name={{ victim['killer'] }}" class="cell-link">{{ victim['killer'] }}</a></td>
                     <td>{{ victim['distance'] }}m</td>
                     <td>{{ victim['weapon'] }}</td>
                   </tr>
@@ -444,7 +450,6 @@ $(document).ready(function() {
   });
 });
 </script>
-
 
 </body>
 </html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ARMA3 Replay Stats Total</title>
+  <style>
+    .small {
+        font-size: 8;
+      }
+    .hide {
+        display: none;
+      }
+    .btn_small {
+        padding: 0.1;
+        font-size: 0.8rem;
+        border-radius: 0.25rem;
+      }
+    .cell-link{
+      color: #1111cd;
+    }
+    .link {
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .link:hover {
+      color: red;
+    }
+    .header {
+      color: red;
+    }
+    .tooltip-inner {
+    white-space: pre-wrap;
+    }
+  </style>
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.23/js/dataTables.bootstrap4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.23/css/dataTables.bootstrap4.min.css">
+
+
+</head>
+
+<body>
+
+<!-- Loading Modal -->
+<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Fog the page when the modal is shown -->
+<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
+
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
+  <h5>маид бай STELS</h5>
+  <h5><a href="/">Mission statistic</a></h5>
+  <h5><a href="/total_tvt">Total TVT 1&2 statistic</a></h5>
+  <h5><a href="/total_if">Total IF statistic</a></h5>
+  {% if tag == "tvt" %}
+  <h5>TVT and TVT2 player statistic, starting 01.01.2020, duration 30min+ </h5>
+  {% else %}
+  <h5>IF player statistic, starting 01.01.2020, duration 10min+ </h5>
+  {% endif %}
+
+  <h1>{{ player_name }}</h1>
+  {% if error_message != '' %}
+  <h3>{{ error_message }}</h3>
+  {% endif %}
+</div>
+
+{% if error_message == '' %}
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <div class="row">
+    <div class="col-md-3">
+      <h3>General data</h3>
+      <table id="general-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <tbody>
+            <tr>
+              <td>Missions played</td>
+              <td>{{ frag_stats['missions'] }}</td>
+            </tr>
+            <tr>
+              <td>Deaths</td>
+              <td>{{ frag_stats['deaths'] }}</td>
+            </tr>
+            <tr>
+              <td>Players frags</td>
+              <td>{{ frag_stats['kills'] }}</td>
+            </tr>
+            <tr>
+              <td>Vehicle frags</td>
+              <td>{{ frag_stats['vehicle_frags'] }}</td>
+            </tr>
+            <tr>
+              <td>(AI)/bot frags</td>
+              <td>{{ frag_stats['bot_frags'] }}</td>
+            </tr>
+            <tr>
+              <td>Teamkills</td>
+              <td>{{ tk_stats['kills'] }}</td>
+            </tr>
+            <tr>
+              <td>Teamkilled</td>
+              <td>{{ frag_stats['teamkilled'] }}</td>
+            </tr>
+            <tr>
+              <td>Kills/missions</td>
+              <td>{{ frag_stats['k_m'] }}</td>
+            </tr>
+            <tr>
+              <td>Kills/Deaths</td>
+              <td>{{ frag_stats['k_d'] }}</td>
+            </tr>
+            <tr>
+              <td>Teamkills/Missions</td>
+              <td>{{ tk_stats['k_m'] }}</td>
+            </tr>
+          </tbody>
+      </table>
+    </div>
+
+    <div class="col-md-3">
+      <h3>Player Frags Top 20</h3>
+      <table id="frags-stats-table" class="paged table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for player, kills in frag_stats['victims'] %}
+            <tr>
+              <td><a href="/total_{{ tag }}/personal?player_name={{ player }}" class="cell-link">{{ player }}</a></td>
+              <td>{{ kills }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+    <div class="col-md-3">
+      <h3>Vehicle Frags Top 10</h3>
+      <table id="vehicle-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for vehicle, kills in frag_stats['vehicle_list'] %}
+            <tr>
+              <td>{{ vehicle }}</td>
+              <td>{{ kills }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+    <div class="col-md-3">
+      <h3>Weapons Top 10</h3>
+      <table id="weapons-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for weapon, mission in frag_stats['weapon_list'] %}
+            <tr>
+              <td>{{ weapon }}</td>
+              <td>{{ mission }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <div class="row">
+    <div class="col-md-3">
+      <h3>Killed by Top 10</h3>
+      <table id="killed-by-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for player, kills in frag_stats['killed_by'] %}
+            <tr>
+              <td><a href="/total_{{ tag }}/personal?player_name={{ player }}" class="cell-link">{{ player }}</a></td>
+              <td>{{ kills }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+    <div class="col-md-3">
+      <h3>Teamkilled by Top 10</h3>
+      <table id="teamkilled-by-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Player</th>
+            <th>Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for player, kills in frag_stats['tk_by'] %}
+            <tr>
+              <td><a href="/total_{{ tag }}/personal?player_name={{ player }}" class="cell-link">{{ player }}</a></td>
+              <td>{{ kills }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <div class="row">
+    <div class="col-md-3">
+      <h3>KS general data</h3>
+          <table id="ks-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+            <tbody>
+                <tr>
+                  <td>Total</td>
+                  <td>{{ ks_win_stat['total'] }}</td>
+                </tr>
+                <tr>
+                  <td>Wins</td>
+                  <td>{{ ks_win_stat['win'] }}</td>
+                </tr>
+                <tr>
+                  <td>Lost</td>
+                  <td>{{ ks_win_stat['lost'] }}</td>
+                </tr>
+                <tr>
+                  <td>Draws</td>
+                  <td>{{ ks_win_stat['draw'] }}</td>
+                </tr>
+                <tr>
+                  <td>Win Rate</td>
+                  <td>{{ ks_win_stat['win_rate'] }}</td>
+                </tr>
+              </tbody>
+          </table>
+    </div>
+
+    <div class="col-md-9">
+      <h3>KS Mision List</h3>
+      <table id="ks-missions-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Date</th>
+            <th>Mission</th>
+            <th>KS 1</th>
+            <th>KS 1 Win</th>
+            <th>KS 2</th>
+            <th>KS 2 Win</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for mission in ks_missions %}
+            <tr>
+              <td>{{ mission['date'] }}</td>
+              <td>{{ mission['mission_name'] }}</td>
+              <td>{{ mission['ks_1'] }}</td>
+              <td>{{ mission['ks_1_win'] }}</td>
+              <td>{{ mission['ks_2'] }}</td>
+              <td>{{ mission['ks_2_win'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+<div class="container-fluid mt-3" style="max-width: 1400px;">
+  <p>Олл райтс резёрвед, копирайт @ 2023</p>
+</div>
+
+<script>
+  $(document).ready(function() {
+    $('.paged').DataTable({
+      "paging": true,
+      "lengthChange": false,
+      "searching": false,
+      "ordering": true,
+      "info": false,
+      "autoWidth": false,
+      "order": [[ 1, "desc" ]]
+    });
+    $('#ks-missions-stats-table').DataTable({
+      "paging": true,
+      "lengthChange": true,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "autoWidth": false,
+      "order": [[0 , "desc" ]]
+    });
+  });
+</script>
+
+</body>
+</html>
