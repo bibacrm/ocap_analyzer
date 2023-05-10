@@ -12,6 +12,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
+# 'Rotation' teams/squads - regular active team/squad names, split and scheduled for each mission side
+# RBC project has 2 servers for playing TVT games, called "TVT1" and "TVT2"
 TVT_1_ROTATION_TEAMS = {
     '1': ['LS', 'URAL', 'STELS', 'KSK', 'BWR', 'DON', 'UN', 'StB', '13th'],
     '2': ['RMC', 'VRG', 'RE', '7th', 'MPU', 'DG', 'TF', 'YKZ', 'B', 'WF']
@@ -20,17 +22,46 @@ TVT_2_ROTATION_TEAMS = {
     '1': ['NT', 'STELS', 'Dw', 'AGG', 'RE', '7th', 'URAL', 'DON', 'VRG', '5th'],
     '2': ['UN', 'RS', 'RMC', 'CBR', 'Delta', '404', 'CA', 'WF', 'ATT', 'KSK']
 }
+VTN_ROTATION_TEAMS = {
+    '1': ['FoS', 'HA', 'TF'],
+    '2': ['Гивай', 'KSK', 'WF']
+}
+IF_ROTATION_TEAMS = {
+    '1': ['MPU', 'DON', 'RATS', 'ANVIL', 'ATW', 'DSG', 'KPblM', 'RS', '7th', 'URAL'],
+    '2': ['StB', 'TF', 'RKKA', 'STC', 'TNA', 'VTS', 'WF', 'Гивай', 'HA', 'KSK']
+}
 
 REPLAY_LIST_URL = 'https://ocap.red-bear.ru/api/v1/operations?tag=&name=&newer=2020-01-01&older=2026-01-01'
+REPLAY_FILE_URL = 'https://ocap.red-bear.ru/data/'
+CACHE_FOLDER = './cache'
+RESULTS_FOLDER = './cache/results'
 MISSION_STATS_FOLDER = './cache/mission_stats'
 MISSION_STATS_FILE = os.path.join(MISSION_STATS_FOLDER, 'missions_stats.json')
 TOTAL_STATS_FOLDER = './cache/total_stats'
 TOTAL_STATS_FILE = os.path.join(TOTAL_STATS_FOLDER, 'total_stats.json')
 TOTAL_STATS_FILE_IF = os.path.join(TOTAL_STATS_FOLDER, 'total_stats_if.json')
+TOTAL_STATS_FILE_VTN = os.path.join(TOTAL_STATS_FOLDER, 'total_stats_vtn.json')
+STEAM_ID_LIST_PATH = "hashids.txt"
 
+TVT_MODE_ID = 'tvt'
+IF_MODE_ID = 'if'
+VTN_MODE_ID = 'vtn'
 MISSION_TAGS_FOR_TOTAL_STATS = ['tvt', 'TvT', 'tvt_ii', 'TvT_II']
 MISSION_TAGS_FOR_TOTAL_STATS_IF = ['if', 'IF']
+MISSION_TAGS_FOR_TOTAL_STATS_VTN = ['Brutal', ]
 VEHICLE_CLASS_COUNT_LIST = ['tank', 'apc', 'car', 'heli', 'plane', 'sea']
+PLAYER_UPDATE_FRAMES = [2100, 1200, 900, 600, 300]  # 35, 20, 15, 10, 5min delay to get updated active player data
+SQUAD_FOR_NON_SQUAD_PLAYERS = '*Odino4ki*'
+TVT_DURATION_LIMIT = 1800  # Seconds, to calculate only real ocap replays, skipping test/filler missions
+IF_DURATION_LIMIT = 300
+VTN_DURATION_LIMIT = 300
+TOTAL_STATISTIC_MISSION_LIMIT = 28  # Missions count player must be part of in order to calculate K/D and K/M stats
+VICTIMS_STAT_LIMIT = 20
+KILLED_BY_STAT_LIMIT = 10
+VEHICLE_STAT_LIMIT = 10
+TEAMKILLED_BY_STAT_LIMIT = 10
+WEAPONS_STAT_LIMIT = 10
+KS_MISSION_LIMIT = 4  # Limit to calculated KS win rate
 
 app = Flask(__name__)
 
@@ -66,11 +97,9 @@ def get_steam_data(d, value):
 
 
 def create_steam_name_list():
-    file_path = "hashids.txt"
-
     name_dict = {}
 
-    with open(file_path, encoding="utf-8") as file:
+    with open(STEAM_ID_LIST_PATH, encoding="utf-8") as file:
         for line in file:
             parts = line.strip().split("\t")
             if len(parts) != 2:
@@ -83,6 +112,34 @@ def create_steam_name_list():
                 name_dict[steam_id] = [name]
 
     return name_dict
+
+
+def open_replay_stat_file(mission_url_hash):
+    cache_results_file = os.path.join(RESULTS_FOLDER, mission_url_hash)
+    if os.path.exists(cache_results_file):
+        with open(cache_results_file, encoding="utf-8") as f:
+            statistic_result = json.load(f)
+        return statistic_result, cache_results_file
+    else:
+        return False, cache_results_file
+
+
+def get_player_squad_name(player_name):
+    # Squad tag parsing logic for a main pattern "[<Squad>]<Player>", "~" is for recruits specific players on RBC
+    # '=]B[=', 'Dw.', 'St.', 'UN' - specific non-pattern squad titles
+    if '=]B[=' in player_name:
+        squad_name = 'B'
+    elif any(i in player_name for i in ["=UN=", '-UN-', '|UN|', '[UN]']):
+        squad_name = 'UN'
+    elif 'Dw.' in player_name:
+        squad_name = 'Dw'
+    elif 'St.' in player_name:
+        squad_name = 'St'
+    elif "[" in player_name and "]" in player_name:
+        squad_name = player_name.split("[")[1].split("]")[0].strip('~')
+    else:
+        squad_name = None
+    return squad_name
 
 
 def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=None):
@@ -103,27 +160,21 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
 
     if data_url is None:
         # Start page case
-        statistic_result['error_message'] = 'Please select a mission replay to get statistic data'
+        statistic_result['error_message'] = 'Select a mission replay to get statistic data'
         return statistic_result
 
     # Cache settings and preparation
-    cache_folder = './cache'
-    results_folder = './cache/results'
-    os.makedirs(cache_folder, exist_ok=True)
-    os.makedirs(results_folder, exist_ok=True)
+    os.makedirs(CACHE_FOLDER, exist_ok=True)
+    os.makedirs(RESULTS_FOLDER, exist_ok=True)
     os.makedirs(MISSION_STATS_FOLDER, exist_ok=True)
 
     mission_url_hash = hashlib.md5(data_url.encode()).hexdigest()
     replay_file_name = data_url.split('/')[-1]
-    cache_file = os.path.join(cache_folder, mission_url_hash)
-    cache_results = os.path.join(results_folder, mission_url_hash)
-    cache_missions = MISSION_STATS_FILE
+    cache_file = os.path.join(CACHE_FOLDER, mission_url_hash)
 
-    # Cache logic
-    if os.path.exists(cache_results):
-        with open(cache_results, encoding="utf-8") as f:
-            statistic_result = json.load(f)
-        return statistic_result
+    cached_statistic_result, cache_results_file = open_replay_stat_file(mission_url_hash)
+    if cached_statistic_result:
+        return cached_statistic_result
 
     if os.path.exists(cache_file):
         with gzip.open(cache_file, "rb") as f:
@@ -141,9 +192,10 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
             temp_file.write(response.content)
         data = json.loads(response.content.decode('utf-8'))
 
+    # No need to get mission results data cache in case only mission statistic is required
     if not only_results:
-        if os.path.exists(cache_missions):
-            with open(cache_missions, encoding="utf-8") as f:
+        if os.path.exists(MISSION_STATS_FILE):
+            with open(MISSION_STATS_FILE, encoding="utf-8") as f:
                 missions_stats_data = json.load(f)
         else:
             missions_stats_data = {}
@@ -153,6 +205,7 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
     mission_author = data.get('missionAuthor')
     mission_duration = seconds_to_human(data.get('endFrame'))
 
+    # Mission date getting from OCAP replay list response json
     mission_date = ''
     for replay in replay_list_data:
         if replay['filename'] in data_url:
@@ -170,11 +223,11 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
     winner = ''
     winner_side = ''
 
-    # Basic data collecting for kill events
+    # Basic data collecting for kill events and mission win data
     for event in data['events']:
         if event[1] == 'killed':
             kill_data = {
-                "victim_id": event[2] if event[2] != 'null' else 999,
+                "victim_id": event[2] if event[2] != 'null' else 999,  # 999 - dummy player entity
                 "killer_id": event[3][0] if event[3][0] != 'null' else 999,
                 "distance": event[4] if event[4] != 'null' else 0,
                 "weapon": event[3][1] if len(event[3]) > 1 else 'no weapon',
@@ -200,9 +253,8 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
         }
 
         # As a player can connect and replace a bot after a while, trying to get and store updated value
-        update_frames = [2100, 1200, 900, 600, 300]  # 35, 20, 15, 10, 5min delay to get updated active player data
         updated_isplayer = 0
-        for update_frame in update_frames:
+        for update_frame in PLAYER_UPDATE_FRAMES:
             try:
                 updated_name = entity['positions'][update_frame][4]
                 player_data['name'] = updated_name if updated_name != '' else player_data['name']
@@ -233,13 +285,10 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
                 sides[1]['players'] += 1
     # Adding a dummy player for handling null or empty statistic records
     players.update(
-        {
-            999:
-                {'id': 999, 'name': '*ARMA*', 'side': 'no_side', 'group': 'no_group', 'type': 'unit', 'is_player': 0}
-         }
+        {999: {'id': 999, 'name': '*ARMA*', 'side': 'no_side', 'group': 'no_group', 'type': 'unit', 'is_player': 0}}
     )
 
-    # Adding a dummy side in case of there were no players on 2nd side
+    # Adding a dummy side in case of there were no active players on 2nd side
     if len(sides) == 1:
         sides.append({'name': players[999]['side'], 'ks': players[999]['name'], 'players': 0, 'tk': 0,
                       'win': 0, 'frags': 0, 'vehicle_frags': 0, 'tag': tag})
@@ -303,20 +352,10 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
                                        'victims': [], 'bot_frags': 0, 'vehicle_frags': 0, 'role': victim_role}
         frag_stats[victim_name]['death_data'] = victim_data
 
-        # Squad tag parsing logic for a main pattern "[<Squad>]<Player>", "~" is for recruits specific players on RBC
-        if '=]B[=' in killer_name:
-            killer_team = 'B'
-        elif any(i in killer_name for i in ["=UN=", '-UN-', '|UN|', '[UN]']):
-            killer_team = 'UN'
-        elif 'Dw.' in killer_name:
-            killer_team = 'Dw'
-        elif "[" in killer_name and "]" in killer_name:
-            killer_team = killer_name.split("[")[1].split("]")[0].strip('~')
-        elif 'St.' in killer_name:
-            killer_team = 'St'
-        else:
-            # specific pseudo squad for players without a squad
-            killer_team = f'Odino4ki {killer_side}'
+        killer_team = get_player_squad_name(killer_name)
+        # specific pseudo squad for players without a squad
+        if killer_team is None:
+            killer_team = f'{SQUAD_FOR_NON_SQUAD_PLAYERS} {killer_side}'
 
         if killer_team not in team_stats:
             team_stats[killer_team] = {'frags': 0, 'side': killer_side, 'teamkills': 0, 'victims': [],
@@ -341,6 +380,7 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
             team_stats[killer_team]['victims'].append(victim_data)
 
     # KO revival calculation logic. Checking player frames for being knocked and then active again cases
+    # TODO Calculates KO events itself, not revivals. To fix
     for player in data['entities']:
         down = False
         for position in player['positions']:
@@ -377,36 +417,38 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
     }
 
     # Calculated statistic storing in cache
-    with open(cache_results, "w") as f:
+    with open(cache_results_file, "w") as f:
         json.dump(statistic_result, f)
 
+    # Updating mission results data cache
     if not only_results:
         missions_stats_data[replay_file_name] = sides
-        with open(cache_missions, "w") as f:
+        with open(MISSION_STATS_FILE, "w") as f:
             json.dump(missions_stats_data, f)
 
     return statistic_result
 
 
-def process_total_stats(tag='tvt'):
+def process_total_stats(tag=TVT_MODE_ID):
     # Getting replay list data
     response = requests.get(REPLAY_LIST_URL)
     replay_list_data = response.json()
-    mission_duration_limit = 1800
+    mission_duration_limit = TVT_DURATION_LIMIT
     tag_list = MISSION_TAGS_FOR_TOTAL_STATS
+
+    if tag == IF_MODE_ID:
+        mission_duration_limit = IF_DURATION_LIMIT
+        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_IF
+    elif tag == VTN_MODE_ID:
+        mission_duration_limit = VTN_DURATION_LIMIT
+        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_VTN
+
     missions_count = sum(
         1 for v in replay_list_data if (v['tag'] in tag_list and v['mission_duration'] > mission_duration_limit)
     )
-    if tag == 'if':
-        mission_duration_limit = 300
-        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_IF
-        missions_count = sum(
-            1 for v in replay_list_data if (v['tag'] in tag_list and v['mission_duration'] > mission_duration_limit)
-        )
 
     logging.info(f'Start processing total {tag} statistic')
 
-    results_folder = './cache/results'
     tk_stats = {}
     tk_stats_steam = {}
     team_tk_stats = {}
@@ -417,45 +459,44 @@ def process_total_stats(tag='tvt'):
 
     os.makedirs(TOTAL_STATS_FOLDER, exist_ok=True)
 
-    total_file = TOTAL_STATS_FILE if tag == 'tvt' else TOTAL_STATS_FILE_IF
+    total_file = TOTAL_STATS_FILE
+    if tag == IF_MODE_ID:
+        total_file = TOTAL_STATS_FILE_IF
+    elif tag == VTN_MODE_ID:
+        total_file = TOTAL_STATS_FILE_VTN
 
     if os.path.exists(total_file):
         with open(total_file, encoding="utf-8") as f:
-            statistic_result = json.load(f)
-        if statistic_result['cache_count'] == missions_count:
+            total_result = json.load(f)
+        if total_result['cache_count'] == missions_count:
             logging.info(f"Cached total {tag} statistic is up to date, no need to refresh it")
-            return statistic_result
+            return total_result
 
     player_steam_dict = create_steam_name_list()
 
     for replay in replay_list_data:
         if replay.get('mission_duration', 0) > mission_duration_limit and replay.get('tag', '') in tag_list:
-            file_url = 'https://ocap.red-bear.ru/data/' + replay['filename'].strip()
+            file_url = REPLAY_FILE_URL + replay['filename'].strip()
             mission_url_hash = hashlib.md5(file_url.encode()).hexdigest()
-            cache_results = os.path.join(results_folder, mission_url_hash)
-            if os.path.exists(cache_results):
-                with open(cache_results, encoding="utf-8") as f:
-                    statistic_result = json.load(f)
-            else:
-                error_message = f'Some {tag} missions OCAP replays are not processed, please do it on the home page'
+
+            total_result, cache_results_file = open_replay_stat_file(mission_url_hash)
+            if not total_result:
+                error_message = f'Some {tag} missions OCAP replays are not processed, please select it on the home page'
                 logging.error(error_message)
                 break
 
-            # ST.to Dw. legacy statistic handling
-            # to_delete = []
+            # ST.to Dw. legacy statistic handling start. Specific case for RBC squad changed name
             player_to_add = []
-            for player, stats in statistic_result['frag_stats'].items():
+            for player, stats in total_result['frag_stats'].items():
                 if 'St.' in player or 'Dw.' in player:
                     new_name = player.replace('St.', '[StDw]')
                     new_name = new_name.replace('Dw.', '[StDw]')
                     player_to_add.append({new_name: stats})
-                    # to_delete.append(player)
-            # for player in to_delete:
-            #     del statistic_result['frag_stats'][player]
+
             for player in player_to_add:
-                statistic_result['frag_stats'].update(player)
+                total_result['frag_stats'].update(player)
             team_to_add = []
-            for team, stats in statistic_result['team_stats'].items():
+            for team, stats in total_result['team_stats'].items():
                 if team == 'St' or team == 'Dw':
                     team_to_add.append(stats)
             if len(team_to_add) > 0:
@@ -466,10 +507,11 @@ def process_total_stats(tag='tvt'):
                     for k, v in team.items():
                         if k in new_stats:
                             new_stats[k] += v
-                statistic_result['team_stats']['StDw'] = new_stats
+                total_result['team_stats']['StDw'] = new_stats
+            # ST.to Dw. legacy statistic handling end.
 
             # By SteamID. Kiberkotlets and Teamkills statistic aggregation
-            for player, stats in statistic_result['frag_stats'].items():
+            for player, stats in total_result['frag_stats'].items():
                 player_name = player.replace(" ", "")
 
                 steam_id, names = get_steam_data(player_steam_dict, player)
@@ -543,7 +585,8 @@ def process_total_stats(tag='tvt'):
                         frag_stats[player_name]['tk_by'][tk_name] += 1
 
             # Kiber squads players and Squad teamkills statistic aggregation
-            for team, stats in statistic_result['team_stats'].items():
+            for team, stats in total_result['team_stats'].items():
+                # removing all non alphanumeric symbols from squad name, '-' is allowed also
                 team_name = re.sub('[^A-Za-z0-9-]+', '', team)
                 if team_name not in team_tk_stats:
                     team_tk_stats[team_name] = {'kills': 0, 'missions': 0}
@@ -566,7 +609,7 @@ def process_total_stats(tag='tvt'):
     for stat_dict in [tk_stats, team_tk_stats, frag_stats, team_frag_stats, frag_stats_steam, tk_stats_steam]:
         to_delete = []
         for item, stat in stat_dict.items():
-            if stat['missions'] > 28:
+            if stat['missions'] > TOTAL_STATISTIC_MISSION_LIMIT:
                 stat['k_m'] = round(stat['kills'] / stat['missions'], 3)
                 if stat_dict == frag_stats or stat_dict == frag_stats_steam:
                     deaths = stat['deaths'] if stat['deaths'] > 0 else 1
@@ -582,15 +625,23 @@ def process_total_stats(tag='tvt'):
             if player.replace(" ", "") == name.replace(" ", ""):
                 del stats['killed_by'][name]
 
-    # sorted(stats['victims'].items(), key=lambda item: item[1], reverse=True)
+    # Leaving top # records for player and team statistic data
     for stat_dict in [frag_stats, team_frag_stats]:
         for name, stats in stat_dict.items():
-            stats['victims'] = heapq.nlargest(20, stats['victims'].items(), key=lambda x: x[1])
+            stats['victims'] = heapq.nlargest(VICTIMS_STAT_LIMIT, stats['victims'].items(), key=lambda x: x[1])
             if stat_dict == frag_stats:
-                stats['killed_by'] = heapq.nlargest(10, stats['killed_by'].items(), key=lambda x: x[1])
-                stats['tk_by'] = heapq.nlargest(10, stats['tk_by'].items(), key=lambda x: x[1])
-                stats['weapon_list'] = heapq.nlargest(10, stats['weapon_list'].items(), key=lambda x: x[1])
-                stats['vehicle_list'] = heapq.nlargest(10, stats['vehicle_list'].items(), key=lambda x: x[1])
+                stats['killed_by'] = heapq.nlargest(
+                    KILLED_BY_STAT_LIMIT, stats['killed_by'].items(), key=lambda x: x[1]
+                )
+                stats['tk_by'] = heapq.nlargest(
+                    TEAMKILLED_BY_STAT_LIMIT, stats['tk_by'].items(), key=lambda x: x[1]
+                )
+                stats['weapon_list'] = heapq.nlargest(
+                    WEAPONS_STAT_LIMIT, stats['weapon_list'].items(), key=lambda x: x[1]
+                )
+                stats['vehicle_list'] = heapq.nlargest(
+                    VEHICLE_STAT_LIMIT, stats['vehicle_list'].items(), key=lambda x: x[1]
+                )
 
     # KS statistic
     with open(MISSION_STATS_FILE, encoding="utf-8") as f:
@@ -622,9 +673,9 @@ def process_total_stats(tag='tvt'):
 
     for ks_name, stats in ks_win_stat.items():
         stats['total'] = stats['win'] + stats['lost'] + stats['draw']
-        stats['win_rate'] = round(stats['win'] / stats['total'], 3) if stats['total'] > 4 else 0
+        stats['win_rate'] = round(stats['win'] / stats['total'], 3) if stats['total'] > KS_MISSION_LIMIT else 0
 
-    statistic_result = {
+    total_result = {
         'cache_count': missions_count,
         'error_message': error_message,
         'frag_stats': frag_stats,
@@ -638,29 +689,30 @@ def process_total_stats(tag='tvt'):
 
     # Calculated statistic storing in cache
     with open(total_file, "w") as f:
-        json.dump(statistic_result, f, default=serialize_sets)
+        json.dump(total_result, f, default=serialize_sets)
     logging.info(f"Total {tag} statistic cache data has been updated")
 
-    return statistic_result
+    return total_result
 
 
-def get_player_stats(player_name, tag='tvt'):
-
+def get_player_stats(player_name, tag=TVT_MODE_ID):
     player = player_name.replace(" ", "")
-
     error_message = ''
 
     total_file = TOTAL_STATS_FILE
     tag_list = MISSION_TAGS_FOR_TOTAL_STATS
-    if tag == 'if':
+    if tag == IF_MODE_ID:
         total_file = TOTAL_STATS_FILE_IF
         tag_list = MISSION_TAGS_FOR_TOTAL_STATS_IF
+    elif tag == VTN_MODE_ID:
+        total_file = TOTAL_STATS_FILE_VTN
+        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_VTN
 
     if os.path.exists(total_file):
         with open(total_file, encoding="utf-8") as f:
             total_stats_result = json.load(f)
     else:
-        error_message = 'Total statistic is missing'
+        error_message = f'Total {tag} statistic is missing'
     if os.path.exists(total_file):
         with open(MISSION_STATS_FILE, encoding="utf-8") as f:
             mission_stats_result = json.load(f)
@@ -669,7 +721,7 @@ def get_player_stats(player_name, tag='tvt'):
 
     frag_stats = total_stats_result.get('frag_stats', {}).get(player, {})
     tk_stats = total_stats_result.get('tk_stats', {}).get(player, {})
-    frag_stats_steam = total_stats_result.get('frag_stats_steam', {}).get(player, {})
+    frag_stats_steam = total_stats_result.get('frag_stats_steam', {}).get(player, {})  # TODO not implemented yet
 
     ks_win_stat = {}
     for k, v in total_stats_result.get('ks_win_stat', {}).items():
@@ -710,25 +762,29 @@ def get_tvt_attendance(tag=None):
 
     error_message = ''
     attendance = {}
-    results_folder = './cache/results'
 
-    tag_list = MISSION_TAGS_FOR_TOTAL_STATS if tag == 'tvt' else MISSION_TAGS_FOR_TOTAL_STATS_IF
+    tag_list = MISSION_TAGS_FOR_TOTAL_STATS if tag == TVT_MODE_ID else MISSION_TAGS_FOR_TOTAL_STATS_IF
+    mission_duration_limit = TVT_DURATION_LIMIT
+    if tag == IF_MODE_ID:
+        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_IF
+        mission_duration_limit = IF_DURATION_LIMIT
+    elif tag == VTN_MODE_ID:
+        tag_list = MISSION_TAGS_FOR_TOTAL_STATS_VTN
+        mission_duration_limit = VTN_DURATION_LIMIT
+
     file_name_list = [
-        r['filename'].strip() for r in replay_list_data if (r['tag'] in tag_list and r['mission_duration'] > 1800)
+        r['filename'].strip() for r in replay_list_data if (r['tag'] in tag_list and r['mission_duration'] > mission_duration_limit)
     ]
     hash_list = {
-        hashlib.md5(('https://ocap.red-bear.ru/data/' + file_name).encode()).hexdigest():file_name for file_name in file_name_list
+        hashlib.md5((REPLAY_FILE_URL + file_name).encode()).hexdigest(): file_name for file_name in file_name_list
     }
 
     for mission_url_hash, file_name in hash_list.items():
         attendance[mission_url_hash] = {'teams': {}, 'rotation': {}, 'non_rotation': {}}
 
-        cache_results = os.path.join(results_folder, mission_url_hash)
-        if os.path.exists(cache_results):
-            with open(cache_results, encoding="utf-8") as f:
-                statistic_result = json.load(f)
-        else:
-            error_message = f'Some {tag} missions OCAP replays are not processed, please do it on the home page'
+        statistic_result, cache_results_file = open_replay_stat_file(mission_url_hash)
+        if not statistic_result:
+            error_message = f'Some {tag} missions OCAP replays are not processed, please select it on the home page'
             logging.error(error_message)
             break
 
@@ -736,21 +792,12 @@ def get_tvt_attendance(tag=None):
             if 'is_player' in data:
                 if data['is_player'] == 0:
                     continue
-            name = data['name']
 
-            if '=]B[=' in name:
-                team = 'B'
-            elif any(i in name for i in ["=UN=", '-UN-', '|UN|', '[UN]']):
-                team = 'UN'
-            elif 'Dw.' in name:
-                team = 'Dw'
-            elif "[" in name and "]" in name:
-                team = name.split("[")[1].split("]")[0].strip('~')
-            elif 'St.' in name:
-                team = 'St'
-            else:
+            name = data['name']
+            team = get_player_squad_name(name)
+            if team is None:
                 # specific pseudo squad for players without a squad
-                team = f'*Odino4ki*'
+                team = f'{SQUAD_FOR_NON_SQUAD_PLAYERS}'
 
             if team not in attendance[mission_url_hash]['teams']:
                 attendance[mission_url_hash]['teams'][team] = {'players': 0}
@@ -770,22 +817,30 @@ def get_tvt_attendance(tag=None):
         weekday_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         weekday_name = weekday_names[weekday_num]
 
+        # OCAP filename pattern is "<YYYY>_<MM>_<DD>__<HH>_<MM>_<mission name>.json"
         file_name_split = file_name.split('_')
         mission_time = f'{file_name_split[4]}:{file_name_split[5]}'
         mission_hour = file_name_split[4]
-
-        if weekday_name in ['Fri', 'Sat'] and int(mission_hour) > 20:
-            tag = '2'
-        else:
-            tag = '1'
 
         attendance[mission_url_hash]['mission_time'] = mission_time
         attendance[mission_url_hash]['tag'] = tag
         attendance[mission_url_hash]['weekday_name'] = weekday_name
 
         rotation_attendance = {'1': {}, '2': {}}
+        rotation_team_list = {}
 
-        rotation_team_list = TVT_1_ROTATION_TEAMS if tag == '1' else TVT_2_ROTATION_TEAMS
+        if tag == 'tvt':
+            if weekday_name in ['Fri', 'Sat'] and int(mission_hour) > 20:
+                tvt_tag = '2'
+            else:
+                tvt_tag = '1'
+            attendance[mission_url_hash]['tag'] = tvt_tag
+            rotation_team_list = TVT_1_ROTATION_TEAMS if tvt_tag == '1' else TVT_2_ROTATION_TEAMS
+        elif tag == 'if':
+            rotation_team_list = IF_ROTATION_TEAMS
+        elif tag == 'vtn':
+            rotation_team_list = VTN_ROTATION_TEAMS
+
         for side in ('1', '2'):
             for team in sorted(rotation_team_list[side]):
                 if team in attendance[mission_url_hash]['teams'].keys():
@@ -795,12 +850,11 @@ def get_tvt_attendance(tag=None):
 
         non_rotation_attendance = {}
         for team in sorted(attendance[mission_url_hash]['teams'].keys()):
-            if team not in rotation_team_list['1'] and team not in rotation_team_list['2'] :
+            if team not in rotation_team_list['1'] and team not in rotation_team_list['2']:
                 non_rotation_attendance[team] = attendance[mission_url_hash]['teams'][team]['players']
 
         attendance[mission_url_hash]['rotation'] = rotation_attendance
         attendance[mission_url_hash]['non_rotation'] = non_rotation_attendance
-
 
     return_report = {
         'attendance': attendance,
@@ -810,8 +864,10 @@ def get_tvt_attendance(tag=None):
     return return_report
 
 
-scheduler.add_job(process_total_stats, 'interval', minutes=15, args=['tvt'])
-scheduler.add_job(process_total_stats, 'interval', minutes=25, args=['if'])
+# Adding scheduled tasks to initiate recalculation of total statistic data
+scheduler.add_job(process_total_stats, 'interval', minutes=17, args=[TVT_MODE_ID])
+scheduler.add_job(process_total_stats, 'interval', minutes=27, args=[IF_MODE_ID])
+scheduler.add_job(process_total_stats, 'interval', minutes=37, args=[VTN_MODE_ID])
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -865,9 +921,8 @@ def index():
     )
 
 
-@app.route('/total_tvt', methods=['GET'])
-def total():
-    tag = 'tvt'
+@app.route('/total_<tag>', methods=['GET'])
+def total(tag):
     stats_report = process_total_stats(tag)
 
     # loading modal window text definition
@@ -889,66 +944,14 @@ def total():
     )
 
 
-@app.route('/total_if', methods=['GET'])
-def total_if():
-    tag = 'if'
-    stats_report = process_total_stats(tag)
-
-    # loading modal window text definition
-    loading_message = "Loading..."
-
-    return render_template(
-        'index_total.html',
-        tag=tag,
-        loading_message=loading_message,
-        error_message=stats_report['error_message'],
-        cache_count=stats_report['cache_count'],
-        tk_stats=stats_report['tk_stats'],
-        tk_stats_steam=stats_report['tk_stats_steam'],
-        team_tk_stats=stats_report['team_tk_stats'],
-        frag_stats=stats_report['frag_stats'],
-        frag_stats_steam=stats_report['frag_stats_steam'],
-        team_frag_stats=stats_report['team_frag_stats'],
-        ks_win_stat=stats_report['ks_win_stat']
-    )
-
-
-@app.route('/total_tvt/personal', methods=['GET'])
-def player_total():
+@app.route('/total_<tag>/personal', methods=['GET'])
+def player_total(tag):
     player_name = request.args.get('player_name')
-    tag = 'tvt'
 
     stats_report = get_player_stats(player_name, tag)
 
     # loading modal window text definition
     loading_message = "Loading..."
-
-    # print(stats_report)
-
-    return render_template(
-        'index_player.html',
-        tag=tag,
-        player_name=player_name,
-        loading_message=loading_message,
-        error_message=stats_report['error_message'],
-        tk_stats=stats_report['tk_stats'],
-        frag_stats=stats_report['frag_stats'],
-        ks_win_stat=stats_report['ks_win_stat'],
-        ks_missions=stats_report['ks_missions']
-    )
-
-
-@app.route('/total_if/personal', methods=['GET'])
-def player_total_if():
-    player_name = request.args.get('player_name')
-    tag = 'if'
-
-    stats_report = get_player_stats(player_name, tag)
-
-    # loading modal window text definition
-    loading_message = "Loading..."
-
-    # print(stats_report)
 
     return render_template(
         'index_player.html',
@@ -972,7 +975,17 @@ def attendance():
     # loading modal window text definition
     loading_message = "Loading..."
 
-    # print(stats_report)
+    rotation_1_1 = sorted(TVT_1_ROTATION_TEAMS['1'])
+    rotation_1_2 = sorted(TVT_1_ROTATION_TEAMS['2'])
+    rotation_2_1 = sorted(TVT_2_ROTATION_TEAMS['1'])
+    rotation_2_2 = sorted(TVT_2_ROTATION_TEAMS['2'])
+
+    if tag == 'if':
+        rotation_1_1 = sorted(IF_ROTATION_TEAMS['1'])
+        rotation_1_2 = sorted(IF_ROTATION_TEAMS['2'])
+    elif tag == 'vtn':
+        rotation_1_1 = sorted(VTN_ROTATION_TEAMS['1'])
+        rotation_1_2 = sorted(VTN_ROTATION_TEAMS['2'])
 
     return render_template(
         'index_attendance2.html',
@@ -980,10 +993,10 @@ def attendance():
         error_message=stats_report['error_message'],
         tag=tag,
         attendance=stats_report['attendance'],
-        rotation_1_1=sorted(TVT_1_ROTATION_TEAMS['1']),
-        rotation_1_2=sorted(TVT_1_ROTATION_TEAMS['2']),
-        rotation_2_1=sorted(TVT_2_ROTATION_TEAMS['1']),
-        rotation_2_2=sorted(TVT_2_ROTATION_TEAMS['2'])
+        rotation_1_1=rotation_1_1,
+        rotation_1_2=rotation_1_2,
+        rotation_2_1=rotation_2_1,
+        rotation_2_2=rotation_2_2
     )
 
 
