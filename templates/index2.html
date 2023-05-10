@@ -64,17 +64,51 @@
 <!-- Fog the page when the modal is shown -->
 <div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
 
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" href="/">
+      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
+      ARMA3 RBC OCAP Based Statistic
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="/">Missions</a>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Total statistic
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
+          <a class="dropdown-item" href="/total_tvt">TVT</a>
+          <a class="dropdown-item" href="/total_if">IF</a>
+          <a class="dropdown-item" href="/total_vtn">VTN</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Attendance
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
+          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
+          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
+          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
+        </div>
+      </li>
+    </ul>
+    <span class="navbar-text">
+      маид бай STELS
+    </span>
+  </div>
+</nav>
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
-  <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
-  <h5>маид бай STELS</h5>
-  <h5><a href="/total_tvt">Total TVT 1&2 statistic</a></h5>
-  <h5><a href="/total_if">Total IF statistic</a></h5>
-  <h5><a href="/attendance?tag=tvt">TVT attendance</a></h5>
-  <h5>Statistic by mission, starting 01.01.2020</h5>
+  <h5>Statistic by missions, starting 01.01.2020</h5>
 
   <form method="post" id="ocap_url_form" class="small">
-    <label for="ocap_url">Enter file URL:</label>
+    <label for="ocap_url">Enter OCAP file URL (from any ARMA project):</label>
     <input type="text" id="ocap_url" name="ocap_url">
     <input type="hidden" id="tag" name="tag">
     <input type="submit" value="Submit">
@@ -375,9 +409,16 @@
   </div>
 </div>
 {% endif %}
+
 <div class="container-fluid mt-3" style="max-width: 1400px;">
-  <p>Олл райтс резёрвед, копирайт @ 2023</p>
+  <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
+    <div class="col-md-4 d-flex align-items-center">
+      <img src="{{ url_for('static', filename='STELS.png') }}" width="30" height="30" class="d-inline-block align-top" alt="" style="margin-right:5px;">
+      <span class="mb-3 mb-md-0 text-muted"> © 2023 Олл райтс резёрвед.</span>
+    </div>
+  </footer>
 </div>
+
 <script>
   $(document).ready(function() {
     $('.stats-table').DataTable({

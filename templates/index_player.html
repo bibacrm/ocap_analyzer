@@ -30,7 +30,12 @@
       color: red;
     }
     .tooltip-inner {
-    white-space: pre-wrap;
+      white-space: pre-wrap;
+    }
+    .dropdown-item:focus, .dropdown-item:hover {
+      color: #16181b;
+      text-decoration: none;
+      background-color: #efefef;
     }
   </style>
 
@@ -66,16 +71,61 @@
 <div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
 
 
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" href="/">
+      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
+      ARMA3 RBC OCAP Based Statistic
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="/">Missions</a>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Total statistic
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
+          <a class="dropdown-item" href="/total_tvt">TVT</a>
+          <a class="dropdown-item" href="/total_if">IF</a>
+          <a class="dropdown-item" href="/total_vtn">VTN</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Attendance
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
+          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
+          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
+          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
+        </div>
+      </li>
+    </ul>
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" href="/total_tvt/personal?player_name={{ player_name }}">Personal TVT</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/total_if/personal?player_name={{ player_name }}">Personal IF</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/total_vtn/personal?player_name={{ player_name }}">Personal VTN</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
 <div class="container-fluid mt-3" style="max-width: 1400px;">
-  <a href="/"><h1>ARMA3 RBC OCAP Based Replay Statistic</h1></a>
-  <h5>маид бай STELS</h5>
-  <h5><a href="/">Mission statistic</a></h5>
-  <h5><a href="/total_tvt">Total TVT 1&2 statistic</a></h5>
-  <h5><a href="/total_if">Total IF statistic</a></h5>
   {% if tag == "tvt" %}
   <h5>TVT and TVT2 player statistic, starting 01.01.2020, duration 30min+ </h5>
-  {% else %}
-  <h5>IF player statistic, starting 01.01.2020, duration 10min+ </h5>
+  {% elif tag == "if" %}
+  <h5>IF player statistic, starting 01.01.2020, duration 5min+ </h5>
+  {% elif tag == "vtn" %}
+  <h5>VTN player statistic, starting 01.01.2020, duration 5min+ </h5>
   {% endif %}
 
   <h1>{{ player_name }}</h1>
@@ -157,7 +207,7 @@
 
     <div class="col-md-3">
       <h3>Vehicle Frags Top 10</h3>
-      <table id="vehicle-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+      <table id="vehicle-stats-table" class="paged table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
             <th>Player</th>
@@ -177,7 +227,7 @@
 
     <div class="col-md-3">
       <h3>Weapons Top 10</h3>
-      <table id="weapons-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+      <table id="weapons-stats-table" class="paged table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
             <th>Player</th>
@@ -202,7 +252,7 @@
   <div class="row">
     <div class="col-md-3">
       <h3>Killed by Top 10</h3>
-      <table id="killed-by-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+      <table id="killed-by-stats-table" class="paged table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
             <th>Player</th>
@@ -222,7 +272,7 @@
 
     <div class="col-md-3">
       <h3>Teamkilled by Top 10</h3>
-      <table id="teamkilled-by-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+      <table id="teamkilled-by-stats-table" class="paged table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
             <th>Player</th>
@@ -306,7 +356,12 @@
 {% endif %}
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
-  <p>Олл райтс резёрвед, копирайт @ 2023</p>
+  <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
+    <div class="col-md-4 d-flex align-items-center">
+      <img src="{{ url_for('static', filename='STELS.png') }}" width="30" height="30" class="d-inline-block align-top" alt="" style="margin-right:5px;">
+      <span class="mb-3 mb-md-0 text-muted"> © 2023 Олл райтс резёрвед.</span>
+    </div>
+  </footer>
 </div>
 
 <script>
