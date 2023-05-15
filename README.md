@@ -1,9 +1,12 @@
 # ocap_analyzer
 ## Basic description
 - Flask based python web app.
-- Downloads a json OCAP replay file, stores it in /cache folder, collects statistic(stores in /cache/results folder also), generates Jinja based web page
+- Downloads a json OCAP replay file, stores it in /cache folder, collects statistic(stores in /cache/results , /cache/missions, /cache/total_stats folder), generates Jinja based web pages
+- Provides statistic for specific mission, brief statistic for all missions in one table, statistic per arma account, statistic per steam_account, attendance statistic, total statistic per project
 - Checked via Python 3.8
 - dependencies to install - 'pip install flask requests apscheduler tqdm'
+- description of configuration parameters is available in config.py file
+- bulk download of replays with required statistic generation can be triggered via 'bulk_processing.py' script
 
 ## Installation on VM (simple CentOS example, via root user)
 1. copy files to some folder, e.g. /root/ocap_stats/
@@ -34,10 +37,27 @@ WantedBy=multi-user.target
 
 ## Some screenshots
 
-![image](https://user-images.githubusercontent.com/79942827/234730940-b951f9bd-eb84-4ab1-b19a-a4e1e3ad78f1.png)
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/958c484b-fb49-47f6-9020-9fcbd95e357a)
 
-![image](https://user-images.githubusercontent.com/79942827/234731114-e9dc2151-5bb8-4747-9a3b-6138803914c9.png)
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/3e9cab40-efcb-4e72-86a4-55ade54b0da6)
 
-![image](https://user-images.githubusercontent.com/79942827/234731243-ac2779ed-ca8c-4cb6-b06e-3e9dcd614966.png)
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/7b00b991-4e2e-41cc-9250-5441136ac824)
 
-![image](https://user-images.githubusercontent.com/79942827/234731308-2207080d-d594-48a2-a6eb-d2a28e21c159.png)
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/23d42ca7-8d34-434b-9723-33e8a420546b)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/35f0e3a5-fd74-4360-9e27-99195797761b)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/852df1b0-2c14-4674-a00c-e3e76ab30926)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/51a3e8c1-1855-45f8-9aef-0239656e4067)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/a859eda5-f6ad-4ac1-ab82-7b4607fd4b7f)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/223e8a15-3501-4a53-b5f0-0da3610efa6e)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/36d8d403-aacc-49ed-b360-de08b91b5e8b)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/5ca92a35-6e0d-43d6-9754-ec06d100d8cd)
+
+![image](https://github.com/bibacrm/ocap_analyzer/assets/79942827/4d7956b8-897d-49ce-a39c-4d6cdfe8f686)
+
