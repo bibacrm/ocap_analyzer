@@ -1,0 +1,41 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" href="https://www.red-bear.ru/">
+      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
+  </a>
+  <a class="navbar-brand" href="/">
+      ARMA3 RBC OCAP Based Statistic
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="/">Missions</a>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Total statistic
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
+          <a class="dropdown-item" href="/total_tvt">TVT</a>
+          <a class="dropdown-item" href="/total_if">IF</a>
+          <a class="dropdown-item" href="/total_vtn">VTN</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Attendance
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
+          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
+          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
+          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
+        </div>
+      </li>
+    </ul>
+    <span class="navbar-text">
+      маид бай STELS
+    </span>
+  </div>
+</nav>

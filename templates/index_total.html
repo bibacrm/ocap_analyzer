@@ -2,37 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ARMA3 Replay Stats Total</title>
-  <style>
-    .small {
-        font-size: 8;
-      }
-    .hide {
-        display: none;
-      }
-    .btn_small {
-        padding: 0.1;
-        font-size: 0.8rem;
-        border-radius: 0.25rem;
-      }
-    .cell-link{
-      color: #1111cd;
-    }
-    .link {
-      color: blue;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-    .link:hover {
-      color: red;
-    }
-    .header {
-      color: red;
-    }
-    .tooltip-inner {
-    white-space: pre-wrap;
-    }
-  </style>
+  <title>RBC Total {{ tag|upper }} Statistic</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
@@ -45,64 +17,7 @@
 </head>
 
 <body>
-
-<!-- Loading Modal -->
-<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
-      </div>
-      <div class="modal-body text-center">
-        <div class="spinner-border text-primary" role="status">
-          <span class="sr-only">Loading...</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Fog the page when the modal is shown -->
-<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <a class="navbar-brand" href="/">
-      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
-      ARMA3 RBC OCAP Based Statistic
-  </a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-  <div class="collapse navbar-collapse" id="navbarNav">
-    <ul class="navbar-nav mr-auto">
-      <li class="nav-item">
-        <a class="nav-link" href="/">Missions</a>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Total statistic
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
-          <a class="dropdown-item" href="/total_tvt">TVT</a>
-          <a class="dropdown-item" href="/total_if">IF</a>
-          <a class="dropdown-item" href="/total_vtn">VTN</a>
-        </div>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Attendance
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
-          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
-          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
-          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
-        </div>
-      </li>
-    </ul>
-    <span class="navbar-text">
-      маид бай STELS
-    </span>
-  </div>
-</nav>
+{% include 'includes/header.html' %}
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   {% if tag == "tvt" %}
@@ -129,7 +44,9 @@
         <th>Missions</th>
         <th>Frags/Missions</th>
         <th>Frags/Deaths</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
+        <th>From Vehicle</th>
+        <th>Victims in Vehicle</th>
         <th>(AI) Kills</th>
         <th data-searchable="false">Victims</th>
       </tr>
@@ -143,6 +60,8 @@
           <td>{{ stats['k_m'] }}</td>
           <td>{{ stats['k_d'] }}</td>
           <td>{{ stats['vehicle_frags'] }}</td>
+          <td>{{ stats['killed_from_vehicle'] }}</td>
+          <td>{{ stats['victims_in_vehicle'] }}</td>
           <td>{{ stats['bot_frags'] }}</td>
           <td>
             {% set salt = range(1, 10000) | random %}
@@ -180,20 +99,33 @@
         <th>Missions</th>
         <th>Frags/Missions</th>
         <th>Frags/Deaths</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
+        <th>From Vehicle</th>
+        <th>Victims in Vehicle</th>
         <th>(AI) Kills</th>
         <th>Name List</th>
+        <th data-searchable="false">Victims</th>
       </tr>
     </thead>
     <tbody>
-        {% for player, stats in frag_stats_steam.items() %}
+        {% for steam_id, stats in frag_stats_steam.items() %}
         <tr>
-          <td>{{ stats['name_last'] }}</td>
+          <td>
+            <a href="/total_{{ tag }}/personal?steam_id={{ steam_id }}" class="cell-link">
+              {{ stats['name_last'] }}
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-steam" viewBox="0 0 16 16">
+                <path d="M.329 10.333A8.01 8.01 0 0 0 7.99 16C12.414 16 16 12.418 16 8s-3.586-8-8.009-8A8.006 8.006 0 0 0 0 7.468l.003.006 4.304 1.769A2.198 2.198 0 0 1 5.62 8.88l1.96-2.844-.001-.04a3.046 3.046 0 0 1 3.042-3.043 3.046 3.046 0 0 1 3.042 3.043 3.047 3.047 0 0 1-3.111 3.044l-2.804 2a2.223 2.223 0 0 1-3.075 2.11 2.217 2.217 0 0 1-1.312-1.568L.33 10.333Z"/>
+                <path d="M4.868 12.683a1.715 1.715 0 0 0 1.318-3.165 1.705 1.705 0 0 0-1.263-.02l1.023.424a1.261 1.261 0 1 1-.97 2.33l-.99-.41a1.7 1.7 0 0 0 .882.84Zm3.726-6.687a2.03 2.03 0 0 0 2.027 2.029 2.03 2.03 0 0 0 2.027-2.029 2.03 2.03 0 0 0-2.027-2.027 2.03 2.03 0 0 0-2.027 2.027Zm2.03-1.527a1.524 1.524 0 1 1-.002 3.048 1.524 1.524 0 0 1 .002-3.048Z"/>
+              </svg>
+            </a>
+          </td>
           <td>{{ stats['kills'] }}</td>
           <td>{{ stats['missions'] }}</td>
           <td>{{ stats['k_m'] }}</td>
           <td>{{ stats['k_d'] }}</td>
           <td>{{ stats['vehicle_frags'] }}</td>
+          <td>{{ stats['killed_from_vehicle'] }}</td>
+          <td>{{ stats['victims_in_vehicle'] }}</td>
           <td>{{ stats['bot_frags'] }}</td>
           <td>
             {% set salt = range(1, 10000) | random %}
@@ -207,6 +139,26 @@
                 {% for name in stats['name_list'] %}
                   <tr>
                     <td>{{ name }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+              </div>
+            </div>
+          </td>
+          <td>
+            {% set salt = range(1, 10000) | random %}
+            <button class="btn-primary btn_small" type="button" data-toggle="collapse" data-target="#team_victims_steam_{{ salt }}" aria-expanded="false" aria-controls="team_victims_steam_{{ salt }}">
+              Show top 20 victims
+            </button>
+            <div class="collapse" id="team_victims_steam_{{ salt }}">
+              <div class="card card-body">
+              <table class="table table-hover table-responsive table-sm">
+                <tbody>
+                {% for name, count in stats['victims']: %}
+                  <tr>
+                    <td><a href="/total_{{ tag }}/personal?player_name={{ name }}" class="cell-link">{{ name }}</a></td>
+                    <td>{{ count }}</td>
                   </tr>
                 {% endfor %}
                 </tbody>
@@ -229,7 +181,7 @@
         <th>Frags</th>
         <th>Missions</th>
         <th>Frags/Missions</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
         <th>(AI) Kills</th>
         <th data-searchable="false">Victims</th>
       </tr>
@@ -388,17 +340,9 @@
       </tbody>
   </table>
 </div>
-
 {% endif %}
 
-<div class="container-fluid mt-3" style="max-width: 1400px;">
-  <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
-    <div class="col-md-4 d-flex align-items-center">
-      <img src="{{ url_for('static', filename='STELS.png') }}" width="30" height="30" class="d-inline-block align-top" alt="" style="margin-right:5px;">
-      <span class="mb-3 mb-md-0 text-muted"> © 2023 Олл райтс резёрвед.</span>
-    </div>
-  </footer>
-</div>
+{% include 'includes/footer.html' %}
 
 <script>
   $(document).ready(function() {

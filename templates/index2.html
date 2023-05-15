@@ -2,37 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ARMA3 Replay Stats</title>
-  <style>
-    .small {
-        font-size: 8;
-      }
-    .hide {
-        display: none;
-      }
-    .btn_small {
-        padding: 0.1;
-        font-size: 0.8rem;
-        border-radius: 0.25rem;
-      }
-    .cell-link{
-      color: #1111cd;
-    }
-    .link{
-      color: blue;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-    .link:hover{
-      color: red;
-    }
-    .header {
-      color: red;
-    }
-    .tooltip-inner {
-    white-space: pre-wrap;
-    }
-  </style>
+  <title>{{ mission_name }} RBC Missions Statistic</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
@@ -41,68 +13,12 @@
   <script src="https://cdn.datatables.net/1.10.23/js/dataTables.bootstrap4.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.10.23/css/dataTables.bootstrap4.min.css">
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css'>
 
 </head>
 
 <body>
-
-<!-- Loading Modal -->
-<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
-      </div>
-      <div class="modal-body text-center">
-        <div class="spinner-border text-primary" role="status">
-          <span class="sr-only">Loading...</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Fog the page when the modal is shown -->
-<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <a class="navbar-brand" href="/">
-      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
-      ARMA3 RBC OCAP Based Statistic
-  </a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-  <div class="collapse navbar-collapse" id="navbarNav">
-    <ul class="navbar-nav mr-auto">
-      <li class="nav-item">
-        <a class="nav-link" href="/">Missions</a>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Total statistic
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
-          <a class="dropdown-item" href="/total_tvt">TVT</a>
-          <a class="dropdown-item" href="/total_if">IF</a>
-          <a class="dropdown-item" href="/total_vtn">VTN</a>
-        </div>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Attendance
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
-          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
-          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
-          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
-        </div>
-      </li>
-    </ul>
-    <span class="navbar-text">
-      маид бай STELS
-    </span>
-  </div>
-</nav>
+{% include 'includes/header.html' %}
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <h5>Statistic by missions, starting 01.01.2020</h5>
@@ -140,9 +56,10 @@
       <tr>
         <th>ID</th>
         <th>Mission name</th>
+        <th>OCAP</th>
         <th>Players</th>
         <th>Frags</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
         <th>TK</th>
         <th>Map</th>
         <th>Duration</th>
@@ -154,12 +71,15 @@
     <tbody>
         {% for replay in replay_list %}
         <tr id="row_{{ replay['id'] }}">
-          <td class="replay_id link">
-            {{ replay['id'] }}
-            <div class="hide">{{ replay['filename'] }}</div>
-            <p class="hide">{{ replay['tag'] }}</p>
+          <td>{{ replay['id'] }}</td>
+          <td>
+            <a class="replay_id link" href="/?filename={{ replay['filename'] }}&mission_tag={{ replay['tag'] }}">
+              {{ replay['mission_name'] }}
+            </a>
           </td>
-          <td>{{ replay['mission_name'] }}</td>
+          <td>
+            <a href="https://ocap.red-bear.ru/?file={{ replay['filename'] }}&frame=0&zoom=1.9&x=-127&y=128" class="cell-link"><button type="button" class="btn_small btn-primary"><span class="bi bi-play"></span> Play</button></a>
+          </td>
           <td>
             {% if 'stats' in replay %}
               {% if replay['stats']|length > 1%}
@@ -169,10 +89,10 @@
                 {% else %}
                   {% set tooltip = replay['stats'][0]['ks'] + '\n' + replay['stats'][1]['ks'] + ' (Winner)' %}
                 {% endif %}
-                <a href="#" data-toggle="tooltip" data-placement="right" data-original-title="{{ tooltip }}">
+                <div class="link" data-toggle="tooltip" data-placement="right" data-original-title="{{ tooltip }}">
                   {% set total = replay['stats'][0]['players'] + replay['stats'][1]['players'] %}
                   {{ total }} ({{ replay['stats'][0]['players'] }}/{{ replay['stats'][1]['players'] }})
-                </a>
+                </div>
               {% endif %}
             {% endif %}
           </td>
@@ -214,7 +134,8 @@
 {% if error_message == '' %}
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <h1>{{ mission_name }}</h1>
-  <h6>Author: {{ mission_author }} Duration: {{ mission_duration }}</h6>
+  <a href="https://ocap.red-bear.ru/?file={{ filename }}&frame=0&zoom=1.9&x=-127&y=128" class="cell-link"><button type="button" class="btn_small btn-primary"><span class="bi bi-play"></span> Play OCAP Replay</button></a>
+  <h6 style="margin-top:5px;">Author: {{ mission_author }} Duration: {{ mission_duration }}</h6>
   {% for side in sides %}
   <h6>{{ side['name'] }} Commandor - {{ side['ks'] }}, Players - {{ side['players'] }}</h6>
   {% endfor %}
@@ -228,7 +149,7 @@
         <th>Side</th>
         <th>Group</th>
         <th>Teamkills</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
         <th>(AI) Kills</th>
         <th>Victims</th>
       </tr>
@@ -259,7 +180,7 @@
                 <table class="table table-hover table-responsive table-sm">
                   <tbody>
                     <tr>
-                      <td colspan="6">Kills</td>
+                      <td colspan="5">Kills</td>
                     </tr>
                     {% for victim in stats['victims'] %}
                     {% if victim['type'] == 'vehicle' %}
@@ -269,22 +190,35 @@
                     {% endif %}
                     <tr {{ victim_style }}>
                       <td style="color:red">{{ victim['teamkilla'] }}</td>
-                      <td>{{ victim['class'] }}</td>
                       <td>{{ victim['time'] }}</td>
-                      <td><a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a></td>
+                      <td>
+                        {% if victim['victim_in_vehicle'] == 1 %}
+                          <img src="{{ url_for('static', filename='helmet_grey.png') }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                        {% elif victim['type'] == 'vehicle' %}
+                          {% set class_img = victim['class']+'.png' %}
+                          <img src="{{ url_for('static', filename=class_img) }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                        {% endif %}
+                        <a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a>
+                      </td>
                       <td>{{ victim['distance'] }}m</td>
-                      <td>{{ victim['weapon'] }}</td>
+                      <td>
+                        {% if victim['killer_in_vehicle'] == 1 %}
+                          <img src="{{ url_for('static', filename='apc_grey.png') }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                        {% endif %}
+                        {{ victim['weapon'] }}
+                      </td>
                     </tr>
                     {% endfor %}
                     {% if 'death_data' in stats %}
                     <tr>
-                      <td colspan="6">Death</td>
+                      <td colspan="5">Death</td>
                     </tr>
                     <tr>
                       <td style="color:red">{{ stats['death_data']['teamkilla'] }}</td>
-                      <td></td>
                       <td>{{ stats['death_data']['time'] }}</td>
-                      <td>{{ stats['death_data']['killer'] }}</td>
+                      <td>
+                        <a href="/total_{{ tag }}/personal?player_name={{ stats['death_data']['killer'] }}" class="cell-link">{{ stats['death_data']['killer'] }}</a>
+                      </td>
                       <td>{{ stats['death_data']['distance'] }}m</td>
                       <td>{{ stats['death_data']['weapon'] }}</td>
                     </tr>
@@ -309,7 +243,7 @@
         <th>Frags</th>
         <th>Side</th>
         <th>Teamkills</th>
-        <th>Tech Kills</th>
+        <th>Vehicle Kills</th>
         <th>(AI) Kills</th>
         <th>Victims</th>
       </tr>
@@ -346,10 +280,22 @@
                   {% endif %}
                   <tr {{ victim_style }}>
                     <td style="color:red">{{ victim['teamkilla'] }}</td>
-                    <td>{{ victim['class'] }}</td>
                     <td>{{ victim['time'] }}</td>
-                    <td><a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a></td>
-                    <td><a href="/total_{{ tag }}/personal?player_name={{ victim['killer'] }}" class="cell-link">{{ victim['killer'] }}</a></td>
+                    <td>
+                      {% if victim['victim_in_vehicle'] == 1 %}
+                        <img src="{{ url_for('static', filename='helmet_grey.png') }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                      {% elif victim['type'] == 'vehicle' %}
+                        {% set class_img = victim['class']+'.png' %}
+                        <img src="{{ url_for('static', filename=class_img) }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                      {% endif %}
+                      <a href="/total_{{ tag }}/personal?player_name={{ victim['victim_name'] }}" class="cell-link">{{ victim['victim_name'] }}</a>
+                    </td>
+                    <td>
+                      {% if victim['killer_in_vehicle'] == 1 %}
+                        <img src="{{ url_for('static', filename='apc_grey.png') }}" width="22" height="22" class="d-inline-block" alt="" style="margin-right:5px;">
+                      {% endif %}
+                      <a href="/total_{{ tag }}/personal?player_name={{ victim['killer'] }}" class="cell-link">{{ victim['killer'] }}</a>
+                    </td>
                     <td>{{ victim['distance'] }}m</td>
                     <td>{{ victim['weapon'] }}</td>
                   </tr>
@@ -368,7 +314,7 @@
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   <div class="row">
     <div class="col-md-6">
-      <h3>KO revival statistic</h3>
+      <h3>Knockout statistic</h3>
       <table id="ko-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
@@ -410,14 +356,7 @@
 </div>
 {% endif %}
 
-<div class="container-fluid mt-3" style="max-width: 1400px;">
-  <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
-    <div class="col-md-4 d-flex align-items-center">
-      <img src="{{ url_for('static', filename='STELS.png') }}" width="30" height="30" class="d-inline-block align-top" alt="" style="margin-right:5px;">
-      <span class="mb-3 mb-md-0 text-muted"> © 2023 Олл райтс резёрвед.</span>
-    </div>
-  </footer>
-</div>
+{% include 'includes/footer.html' %}
 
 <script>
   $(document).ready(function() {
@@ -453,25 +392,6 @@
       $('#tag').val(tag);
       $('#ocap_url_form').submit();
     }
-  });
-</script>
-
-<script>
-  $(function() {
-    // show the loading modal on form submit
-    $('form').submit(function() {
-      $('#loadingModal').modal({
-        backdrop: 'static',
-        keyboard: false
-      });
-      $('#loadingFog').show();
-    });
-
-    // hide the loading modal on page load
-    $(window).on('load', function() {
-      $('#loadingModal').modal('hide');
-      $('#loadingFog').hide();
-    });
   });
 </script>
 

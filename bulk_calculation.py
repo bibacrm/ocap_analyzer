@@ -37,7 +37,6 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
 
 # print(results)
 
-# worked not well via threads don`t know why(boring to investigate), so here is a simple loop
 for i, replay in enumerate(replay_list_data):
     data_url = 'https://ocap.red-bear.ru/data/' + replay['filename'].strip()
     replay_file_name = data_url.split('/')[-1]

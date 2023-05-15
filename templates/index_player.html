@@ -2,42 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ARMA3 Replay Stats Total</title>
-  <style>
-    .small {
-        font-size: 8;
-      }
-    .hide {
-        display: none;
-      }
-    .btn_small {
-        padding: 0.1;
-        font-size: 0.8rem;
-        border-radius: 0.25rem;
-      }
-    .cell-link{
-      color: #1111cd;
-    }
-    .link {
-      color: blue;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-    .link:hover {
-      color: red;
-    }
-    .header {
-      color: red;
-    }
-    .tooltip-inner {
-      white-space: pre-wrap;
-    }
-    .dropdown-item:focus, .dropdown-item:hover {
-      color: #16181b;
-      text-decoration: none;
-      background-color: #efefef;
-    }
-  </style>
+  {% if player_name is not none %}
+    {% set title_name = player_name %}
+  {% else %}
+    {% set title_name = frag_stats['name_last']+' Steam' %}
+  {% endif %}
+  <title>RBC {{ tag|upper }} {{ title_name }} Statistic</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
@@ -46,78 +18,13 @@
   <script src="https://cdn.datatables.net/1.10.23/js/dataTables.bootstrap4.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.10.23/css/dataTables.bootstrap4.min.css">
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css'>
 
 
 </head>
 
 <body>
-
-<!-- Loading Modal -->
-<div class="modal fade show" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="loadingModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="loadingModalLabel">{{ loading_message }}</h5>
-      </div>
-      <div class="modal-body text-center">
-        <div class="spinner-border text-primary" role="status">
-          <span class="sr-only">Loading...</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Fog the page when the modal is shown -->
-<div id="loadingFog" class="modal-backdrop fade show" style="display: none;"></div>
-
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <a class="navbar-brand" href="/">
-      <img src="{{ url_for('static', filename='logo.png') }}" width="30" height="30" class="d-inline-block align-top" alt="">
-      ARMA3 RBC OCAP Based Statistic
-  </a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-  <div class="collapse navbar-collapse" id="navbarNav">
-    <ul class="navbar-nav mr-auto">
-      <li class="nav-item">
-        <a class="nav-link" href="/">Missions</a>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navTotalDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Total statistic
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navTotalDropdown">
-          <a class="dropdown-item" href="/total_tvt">TVT</a>
-          <a class="dropdown-item" href="/total_if">IF</a>
-          <a class="dropdown-item" href="/total_vtn">VTN</a>
-        </div>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="navAttendanceDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          Attendance
-        </a>
-        <div class="dropdown-menu" aria-labelledby="navAttendanceDropdown">
-          <a class="dropdown-item" href="/attendance?tag=tvt">TVT</a>
-          <a class="dropdown-item" href="/attendance?tag=if">IF</a>
-          <a class="dropdown-item" href="/attendance?tag=vtn">VTN</a>
-        </div>
-      </li>
-    </ul>
-    <ul class="navbar-nav">
-      <li class="nav-item">
-        <a class="nav-link" href="/total_tvt/personal?player_name={{ player_name }}">Personal TVT</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/total_if/personal?player_name={{ player_name }}">Personal IF</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/total_vtn/personal?player_name={{ player_name }}">Personal VTN</a>
-      </li>
-    </ul>
-  </div>
-</nav>
+{% include 'includes/header.html' %}
 
 <div class="container-fluid mt-3" style="max-width: 1400px;">
   {% if tag == "tvt" %}
@@ -128,7 +35,16 @@
   <h5>VTN player statistic, starting 01.01.2020, duration 5min+ </h5>
   {% endif %}
 
-  <h1>{{ player_name }}</h1>
+  {% if player_name is not none %}
+    <h1>Player {{ tag|upper }} statistic. {{ player_name }}</h1>
+    <a href="/total_{{ tag }}/personal?steam_id={{ steam_id }}" class="cell-link"><button type="button" class="btn btn-secondary" style="padding-top:3px;padding-bottom:3px;"><span class="bi bi-steam"></span> Steam account statistic</button></a>
+  {% else %}
+    <h1>Steam account {{ tag|upper }} statistic. Last name - {{ frag_stats['name_last'] }}</h1>
+    All player names:
+    {% for name in frag_stats['name_list'] %}
+        <a href="/total_{{ tag }}/personal?player_name={{ name }}" class="cell-link"><button type="button" class="btn btn-secondary" style="padding-top:3px;padding-bottom:3px;"><span class="bi bi-person"></span> {{ name }}</button></a>
+    {% endfor %}
+  {% endif %}
   {% if error_message != '' %}
   <h3>{{ error_message }}</h3>
   {% endif %}
@@ -180,6 +96,14 @@
             <tr>
               <td>Teamkills/Missions</td>
               <td>{{ tk_stats['k_m'] }}</td>
+            </tr>
+            <tr>
+              <td>Frags sitting in vehicle</td>
+              <td>{{ frag_stats['killed_from_vehicle'] }}</td>
+            </tr>
+            <tr>
+              <td>Victims sitting in vehicle</td>
+              <td>{{ frag_stats['victims_in_vehicle'] }}</td>
             </tr>
           </tbody>
       </table>
@@ -290,6 +214,48 @@
       </table>
     </div>
 
+    {% if 'last_missions' in frag_stats %}
+    <div class="col-md-6">
+      <h3>Last played Missions</h3>
+      <table id="last-missions-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
+        <thead class="thead-dark">
+          <tr>
+            <th>Date</th>
+            <th>Mission</th>
+            <th>OCAP</th>
+            <th>Frags</th>
+            <th>Vehicles</th>
+            <!--
+            <th>From Vehicle</th>
+            <th>Victim in Vehicle</th>
+            -->
+          </tr>
+        </thead>
+        <tbody>
+            {% for mission, stats in frag_stats['last_missions'].items() %}
+            <tr>
+              <td style="font-size:16px;">{{ stats['date'] }}</td>
+              <td style="font-size:16px;">
+                  <a class="replay_id link" href="/?filename={{ stats['filename'] }}&mission_tag={{ tag }}">
+                    {{ mission }}
+                  </a>
+              </td>
+              <td>
+                <a href="https://ocap.red-bear.ru/?file={{ stats['filename'] }}&frame=0&zoom=1.9&x=-127&y=128" class="cell-link"><button type="button" class="btn_small btn-primary"><span class="bi bi-play"></span> Play</button></a>
+              </td>
+              <td>{{ stats['kills'] }}</td>
+              <td>{{ stats['vehicle_frags'] }}</td>
+              <!--
+              <td>{{ stats['killed_from_vehicle'] }}</td>
+              <td>{{ stats['victims_in_vehicle'] }}</td>
+              -->
+            </tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 
@@ -324,12 +290,13 @@
     </div>
 
     <div class="col-md-9">
-      <h3>KS Mision List</h3>
+      <h3>KS Mission List</h3>
       <table id="ks-missions-stats-table" class="table table-striped table-bordered stats-table table-hover table-sm">
         <thead class="thead-dark">
           <tr>
             <th>Date</th>
             <th>Mission</th>
+            <th>OCAP</th>
             <th>KS 1</th>
             <th>KS 1 Win</th>
             <th>KS 2</th>
@@ -340,7 +307,14 @@
             {% for mission in ks_missions %}
             <tr>
               <td>{{ mission['date'] }}</td>
-              <td>{{ mission['mission_name'] }}</td>
+              <td>
+                  <a class="replay_id link" href="/?filename={{ mission['filename'] }}&mission_tag={{ mission['tag'] }}">
+                    {{ mission['mission_name'] }}
+                  </a>
+              </td>
+              <td>
+                <a href="https://ocap.red-bear.ru/?file={{ mission['filename'] }}&frame=0&zoom=1.9&x=-127&y=128" class="cell-link"><button type="button" class="btn_small btn-primary"><span class="bi bi-play"></span> Play</button></a>
+              </td>
               <td>{{ mission['ks_1'] }}</td>
               <td>{{ mission['ks_1_win'] }}</td>
               <td>{{ mission['ks_2'] }}</td>
@@ -352,17 +326,9 @@
     </div>
   </div>
 </div>
-
 {% endif %}
 
-<div class="container-fluid mt-3" style="max-width: 1400px;">
-  <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
-    <div class="col-md-4 d-flex align-items-center">
-      <img src="{{ url_for('static', filename='STELS.png') }}" width="30" height="30" class="d-inline-block align-top" alt="" style="margin-right:5px;">
-      <span class="mb-3 mb-md-0 text-muted"> © 2023 Олл райтс резёрвед.</span>
-    </div>
-  </footer>
-</div>
+{% include 'includes/footer.html' %}
 
 <script>
   $(document).ready(function() {
@@ -383,6 +349,15 @@
       "info": true,
       "autoWidth": false,
       "order": [[0 , "desc" ]]
+    });
+    $('#last-missions-stats-table').DataTable({
+      "paging": true,
+      "lengthChange": false,
+      "searching": false,
+      "ordering": true,
+      "info": false,
+      "autoWidth": false,
+      "order": [[ 0, "desc" ]]
     });
   });
 </script>

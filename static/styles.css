@@ -1,0 +1,36 @@
+.small {
+    font-size: 8;
+  }
+.hide {
+    display: none;
+  }
+.btn_small {
+    padding: 0.1;
+    font-size: 0.8rem;
+    border-radius: 0.25rem;
+  }
+.cell-link{
+  color: #0e42b9;
+}
+.link {
+  color: black;
+  cursor: pointer;
+}
+.link:hover {
+  text-decoration: underline;
+  color: red;
+}
+.header {
+  color: red;
+}
+.tooltip-inner {
+  white-space: pre-wrap;
+}
+.dropdown-item:focus, .dropdown-item:hover {
+  color: #16181b;
+  text-decoration: none;
+  background-color: #efefef;
+}
+.replay_id {
+  font-weight: 500;
+}
