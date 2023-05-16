@@ -29,7 +29,7 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 ```
-- 0.0.0.0 - si network sharing configuration to be available for anyone
+- 0.0.0.0 - a network sharing configuration to be available for anyone
 - :80 - port
 - timeout 90 - timeout application will keep connection opened, e.g. time for web page to be opened/downloaded
 - workers - usually calculated as (CPU_amount*2)+1, so '5' is for VM with 2 CPUs, '9' will be for VM with 4 CPUs
