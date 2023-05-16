@@ -4,14 +4,14 @@
 - Downloads a json OCAP replay file, stores it in /cache folder, collects statistic(stores in /cache/results , /cache/missions, /cache/total_stats folder), generates Jinja based web pages
 - Provides statistic for specific mission, brief statistic for all missions in one table, statistic per arma account, statistic per steam_account, attendance statistic, total statistic per project
 - Checked via Python 3.8
-- dependencies to install - 'pip install flask requests apscheduler tqdm'
+- dependencies to install - "pip install pip install -r requirements.txt" (flask requests apscheduler tqdm)
 - description of configuration parameters is available in config.py file
 - bulk download of replays with required statistic generation can be triggered via 'bulk_processing.py' script
 
 ## Installation on VM (simple CentOS example, via root user)
 1. copy files to some folder, e.g. /root/ocap_stats/
 2. install python and pip, e.g. "yum install python3 python3-pip"
-3. install dependencies, e.g. "pip install flask requests gunicorn"
+3. install dependencies, e.g. "pip install pip install -r requirements.txt"
 4. adjust firewall settings in order 80 port to be opened outside ,e.g. 'firewall-cmd --add-port=80/tcp --permanent'
 5. create a new file(e.g. "ocap_stats.service") and copy it to /etc/systemd/system/ folder:
 ```
