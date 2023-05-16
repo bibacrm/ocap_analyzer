@@ -4,14 +4,14 @@
 - Downloads a json OCAP replay file, stores it in /cache folder, collects statistic(stores in /cache/results , /cache/missions, /cache/total_stats folder), generates Jinja based web pages
 - Provides statistic for specific mission, brief statistic for all missions in one table, statistic per arma account, statistic per steam_account, attendance statistic, total statistic per project
 - Checked via Python 3.8
-- dependencies to install - "pip install pip install -r requirements.txt" (flask requests apscheduler tqdm)
+- dependencies to install - "pip install -r requirements.txt" (flask requests apscheduler tqdm)
 - description of configuration parameters is available in config.py file
 - bulk download of replays with required statistic generation can be triggered via 'bulk_processing.py' script
 
 ## Installation on VM (simple CentOS example, via root user)
 1. copy files to some folder, e.g. /root/ocap_stats/
 2. install python and pip, e.g. "yum install python3 python3-pip"
-3. install dependencies, e.g. "pip install pip install -r requirements.txt"
+3. install dependencies, e.g. "pip install -r requirements.txt"
 4. adjust firewall settings in order 80 port to be opened outside ,e.g. 'firewall-cmd --add-port=80/tcp --permanent'
 5. create a new file(e.g. "ocap_stats.service") and copy it to /etc/systemd/system/ folder:
 ```
@@ -29,6 +29,12 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 ```
+- 0.0.0.0 - si network sharing configuration to be available for anyone
+- :80 - port
+- timeout 90 - timeout application will keep connection opened, e.g. time for web page to be opened/downloaded
+- workers - usually calculated as (CPU_amount*2)+1, so '5' is for VM with 2 CPUs, '9' will be for VM with 4 CPUs
+- preload - is required to orchestrate process scheduler correctly only on first application load.
+
 6. run "systemctl daemon-reload" to reload 'autorun' service list
 7. run "systemctl start ocap_stats" to start application service
 8. run "systemctl enable ocap_stats" to add application service in 'autorun' list
