@@ -133,7 +133,7 @@ def process_ocap_file(data_url, only_results=False, tag=None, replay_list_data=N
                 updated_name = entity['positions'][update_frame][4]
                 player_data['name'] = updated_name if updated_name != '' else player_data['name']
                 updated_isplayer = entity['positions'][update_frame][5]
-                if updated_isplayer == 1:
+                if updated_isplayer == 1 and updated_name != '':
                     player_data['is_player'] = 1
                     break
             except IndexError:
