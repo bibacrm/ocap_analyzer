@@ -115,8 +115,11 @@
           <td>
             {% if 'stats' in replay %}
               {% if replay['stats']|length > 1%}
-                {% set total = replay['stats'][0]['tk'] + replay['stats'][1]['tk'] %}
-                {{ total }} ({{ replay['stats'][0]['tk'] }}/{{ replay['stats'][1]['tk'] }})
+                {% set total_tk = replay['stats'][0]['tk'] + replay['stats'][1]['tk'] %}
+                {% set tooltip_tk = replay['stats'][0]['tk']|string + ' / ' + replay['stats'][1]['tk']|string %}
+                <div class="link" data-toggle="tooltip" data-placement="right" data-original-title="{{ tooltip_tk }}">
+                  {{ total_tk }}
+                </div>
               {% endif %}
             {% endif %}
           </td>
